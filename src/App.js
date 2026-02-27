@@ -158,6 +158,7 @@ function App() {
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [showModal, setShowModal] = useState(false);
+  const [showConfigModal, setShowConfigModal] = useState(false);
   const [apiUrlConfig, setApiUrlConfig] = useState('');
   const [apiKeyConfig, setApiKeyConfig] = useState('');
   const [modelConfig, setModelConfig] = useState('');
@@ -825,6 +826,10 @@ function App() {
     setShowModal(false);
   };
 
+  const handleCloseConfigModal = () => {
+    setShowConfigModal(false);
+  };
+
   // 在 App 组件中添加复制函数
   const handleCopyText = () => {
     if (results[currentIndex]) {
@@ -929,37 +934,13 @@ function App() {
                   {showUrlInput ? '取消' : '使用链接'}
                 </button>
               )}
-            </div>
-
-            <div className="api-config-panel">
-              <div className="api-config-title">Gemini 配置（留空回落到环境变量）</div>
-              <div className="api-config-grid">
-                <input
-                  type="url"
-                  value={apiUrlConfig}
-                  onChange={(e) => setApiUrlConfig(e.target.value)}
-                  placeholder="Gemini API URL"
-                  className="api-config-input"
-                />
-                <input
-                  type="password"
-                  value={apiKeyConfig}
-                  onChange={(e) => setApiKeyConfig(e.target.value)}
-                  placeholder="Gemini API Key"
-                  className="api-config-input"
-                  autoComplete="off"
-                />
-                <input
-                  type="text"
-                  value={modelConfig}
-                  onChange={(e) => setModelConfig(e.target.value)}
-                  placeholder="模型名称（如 gemini-2.5-flash）"
-                  className="api-config-input"
-                />
-              </div>
-              <p className="api-config-hint">
-                当前默认值：URL {envGeminiApiUrl}，Model {envGeminiModel}
-              </p>
+              <button
+                type="button"
+                className="config-trigger-button"
+                onClick={() => setShowConfigModal(true)}
+              >
+                API 配置
+              </button>
             </div>
             
             {showUrlInput && !isMobile && (
@@ -1055,6 +1036,77 @@ function App() {
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <img src={images[currentIndex]} alt="放大预览" />
             <button className="modal-close" onClick={handleCloseModal}>×</button>
+          </div>
+        </div>
+      )}
+
+      {showConfigModal && (
+        <div className="modal-overlay" onClick={handleCloseConfigModal}>
+          <div className="modal-content config-modal-content" onClick={e => e.stopPropagation()}>
+            <button className="modal-close" onClick={handleCloseConfigModal}>×</button>
+            <h2 className="config-modal-title">Gemini API 配置</h2>
+            <p className="config-modal-subtitle">页面填写优先生效；留空时自动回落到环境变量。</p>
+
+            <div className="api-config-grid">
+              <label className="config-field">
+                <span className="config-field-label">API URL</span>
+                <input
+                  type="url"
+                  value={apiUrlConfig}
+                  onChange={(e) => setApiUrlConfig(e.target.value)}
+                  placeholder="https://generativelanguage.googleapis.com/v1beta"
+                  className="api-config-input"
+                />
+              </label>
+
+              <label className="config-field">
+                <span className="config-field-label">API Key</span>
+                <input
+                  type="password"
+                  value={apiKeyConfig}
+                  onChange={(e) => setApiKeyConfig(e.target.value)}
+                  placeholder="Gemini API Key"
+                  className="api-config-input"
+                  autoComplete="off"
+                />
+              </label>
+
+              <label className="config-field">
+                <span className="config-field-label">Model</span>
+                <input
+                  type="text"
+                  value={modelConfig}
+                  onChange={(e) => setModelConfig(e.target.value)}
+                  placeholder="gemini-2.5-flash"
+                  className="api-config-input"
+                />
+              </label>
+            </div>
+
+            <p className="api-config-hint">
+              环境默认值：URL {envGeminiApiUrl}，Model {envGeminiModel}
+            </p>
+
+            <div className="config-modal-actions">
+              <button
+                type="button"
+                className="config-clear-button"
+                onClick={() => {
+                  setApiUrlConfig('');
+                  setApiKeyConfig('');
+                  setModelConfig('');
+                }}
+              >
+                清空并回落环境变量
+              </button>
+              <button
+                type="button"
+                className="config-save-button"
+                onClick={handleCloseConfigModal}
+              >
+                完成
+              </button>
+            </div>
           </div>
         </div>
       )}
