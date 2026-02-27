@@ -17,6 +17,7 @@ export default async function handler(req, res) {
 
   try {
     const { imageData } = req.body;
+    const modelName = process.env.OPENAI_MODEL || "gpt-4o";
 
     // 创建OpenAI客户端实例，使用自定义配置
     const configuration = {
@@ -29,7 +30,7 @@ export default async function handler(req, res) {
 
     // 创建请求选项
     const requestOptions = {
-      model: "gpt-4o",
+      model: modelName,
       messages: [
         {
           role: "user",

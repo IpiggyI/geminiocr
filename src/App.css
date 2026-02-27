@@ -659,6 +659,52 @@ main.has-content {
   transform: translateY(-2px);
 }
 
+.api-config-panel {
+  width: 100%;
+  margin-top: 0.75rem;
+  padding: 0.9rem;
+  border: 1px solid rgba(0, 113, 227, 0.18);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.api-config-title {
+  color: #1d1d1f;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 0.6rem;
+}
+
+.api-config-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.55rem;
+}
+
+.api-config-input {
+  width: 100%;
+  padding: 0.72rem 0.8rem;
+  border: 1px solid rgba(0, 113, 227, 0.25);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.92);
+  font-size: 0.92rem;
+  color: #1d1d1f;
+}
+
+.api-config-input:focus {
+  outline: none;
+  border-color: #0071e3;
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1);
+}
+
+.api-config-hint {
+  margin: 0.65rem 0 0;
+  color: #6e6e73;
+  font-size: 0.78rem;
+  text-align: left;
+  word-break: break-all;
+}
+
 /* URL 输入表单样式 */
 .url-form {
   width: 100%;
@@ -699,6 +745,12 @@ main.has-content {
 .url-submit:hover {
   background: #0077ed;
   transform: translateY(-2px);
+}
+
+@media (max-width: 900px) {
+  .api-config-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 /* 响应式布局优化 */
@@ -2130,4 +2182,3 @@ main.has-content {
     font-size: 0.9em;
   }
 }
-

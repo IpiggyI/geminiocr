@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Viewer } from '@bytemd/react';
 import mathPlugin from '@bytemd/plugin-math';
 import gfmPlugin from '@bytemd/plugin-gfm';
@@ -32,8 +31,8 @@ const plugins = [
   frontmatterPlugin()
 ];
 
-// 初始化 Gemini API
-const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
+const DEFAULT_GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta';
+const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 
 // 添加 generationConfig 配置
 const generationConfig = {
@@ -294,9 +293,136 @@ function App() {
   const [isStreaming, setIsStreaming] = useState(false);
   const [numPages, setNumPages] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const [modelType, setModelType] = useState('openai');
+  const [apiUrlConfig, setApiUrlConfig] = useState('');
+  const [apiKeyConfig, setApiKeyConfig] = useState('');
+  const [modelConfig, setModelConfig] = useState('');
   const [isCorrectingText, setIsCorrectingText] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  const envGeminiApiUrl = process.env.REACT_APP_GEMINI_API_URL || DEFAULT_GEMINI_API_URL;
+  const envGeminiApiKey = process.env.REACT_APP_GEMINI_API_KEY || '';
+  const envGeminiModel = process.env.REACT_APP_GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+
+  const getGeminiRuntimeConfig = () => {
+    const apiUrl = apiUrlConfig.trim() || envGeminiApiUrl;
+    const apiKey = apiKeyConfig.trim() || envGeminiApiKey;
+    const model = (modelConfig.trim() || envGeminiModel).replace(/^models\//, '');
+
+    if (!apiKey) {
+      throw new Error('缺少 Gemini API Key，请在页面配置或环境变量 REACT_APP_GEMINI_API_KEY 中设置');
+    }
+
+    return { apiUrl, apiKey, model };
+  };
+
+  const buildGeminiEndpoint = (apiUrl, model, apiKey) => {
+    const normalizedUrl = apiUrl.replace(/\/+$/, '');
+
+    if (normalizedUrl.includes(':streamGenerateContent')) {
+      const hasQuery = normalizedUrl.includes('?');
+      const withAlt = /[?&]alt=/.test(normalizedUrl)
+        ? normalizedUrl
+        : `${normalizedUrl}${hasQuery ? '&' : '?'}alt=sse`;
+      return /[?&]key=/.test(withAlt)
+        ? withAlt
+        : `${withAlt}&key=${encodeURIComponent(apiKey)}`;
+    }
+
+    return `${normalizedUrl}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
+  };
+
+  const extractGeminiChunkText = (payload) =>
+    (payload.candidates || [])
+      .flatMap((candidate) => candidate?.content?.parts || [])
+      .map((part) => part?.text || '')
+      .join('');
+
+  const streamGeminiContent = async ({ prompt, imageData, mimeType, onTextChunk }) => {
+    const { apiUrl, apiKey, model } = getGeminiRuntimeConfig();
+    const endpoint = buildGeminiEndpoint(apiUrl, model, apiKey);
+    const parts = [{ text: prompt }];
+
+    if (imageData && mimeType) {
+      parts.push({
+        inline_data: {
+          data: imageData,
+          mime_type: mimeType
+        }
+      });
+    }
+
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts
+          }
+        ],
+        generationConfig
+      })
+    });
+
+    if (!response.ok) {
+      let errorDetail = '';
+      try {
+        const errorBody = await response.json();
+        errorDetail = errorBody?.error?.message || JSON.stringify(errorBody);
+      } catch (error) {
+        errorDetail = await response.text();
+      }
+      throw new Error(`Gemini API 请求失败 (${response.status}): ${errorDetail || response.statusText}`);
+    }
+
+    if (!response.body) {
+      throw new Error('Gemini API 未返回可读取的流式响应');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    const consumeLine = (line) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith('data:')) {
+        return;
+      }
+      const rawPayload = trimmed.slice(5).trim();
+      if (!rawPayload || rawPayload === '[DONE]') {
+        return;
+      }
+
+      try {
+        const payload = JSON.parse(rawPayload);
+        const chunkText = extractGeminiChunkText(payload);
+        if (chunkText) {
+          onTextChunk(chunkText);
+        }
+      } catch (error) {
+        console.error('Gemini SSE 数据解析失败:', error);
+      }
+    };
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) {
+        break;
+      }
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      lines.forEach(consumeLine);
+    }
+
+    if (buffer.trim()) {
+      consumeLine(buffer);
+    }
+  };
 
   // 添加检测移动设备的 useEffect
   useEffect(() => {
@@ -420,132 +546,29 @@ function App() {
         setStreamingStates(prev => ({ ...prev, [index]: true }));
         setStreamingTexts(prev => ({ ...prev, [index]: '' }));
         
-        {
-          const fileReader = new FileReader();
-          const imageData = await new Promise((resolve) => {
-            fileReader.onloadend = () => {
-              resolve(fileReader.result);
-            };
-            fileReader.readAsDataURL(file);
-          });
+        const fileReader = new FileReader();
+        const imageData = await new Promise((resolve) => {
+          fileReader.onloadend = () => {
+            resolve(fileReader.result);
+          };
+          fileReader.readAsDataURL(file);
+        });
 
-          if (modelType === 'openai') {
-            // OpenAI API调用
-            const response = await fetch(process.env.REACT_APP_OPENAI_API_URL, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${process.env.REACT_APP_OPENAI_API_KEY}`
-              },
-              body: JSON.stringify({
-                // model: "gemini-2.0-flash-exp",
-                model: "gemini-2.5-flash",
-                messages: [
-                  {
-                    role: "user",
-                    content: [
-                      {
-                        type: "text",
-                        text: OCR_PROMPT
-                      },
-                      {
-                        type: "image_url",
-                        image_url: {
-                          url: imageData
-                        }
-                      }
-                    ]
-                  }
-                ],
-                max_tokens: 8000,
-                stream: true
-              })
+        await streamGeminiContent({
+          prompt: OCR_PROMPT,
+          imageData: imageData.split(',')[1],
+          mimeType: file.type,
+          onTextChunk: (chunkText) => {
+            fullText += chunkText;
+
+            setStreamingTexts(prev => ({ ...prev, [index]: fullText }));
+            setResults(prevResults => {
+              const newResults = [...prevResults];
+              newResults[index] = fullText;
+              return newResults;
             });
-
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder();
-
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-
-              const chunk = decoder.decode(value);
-              const lines = chunk.split('\n');
-              
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  try {
-                    const data = JSON.parse(line.slice(6));
-                    const content = data.choices?.[0]?.delta?.content || '';
-                    if (content) {
-                      fullText += content;
-                      
-                      // 更新这一页的streaming文本
-                      setStreamingTexts(prev => ({ ...prev, [index]: fullText }));
-                      
-                      // 更新结果数组
-                      setResults(prevResults => {
-                        const newResults = [...prevResults];
-                        newResults[index] = fullText;
-                        return newResults;
-                      });
-                    }
-                  } catch (e) {
-                    console.error('Error parsing chunk:', e);
-                  }
-                }
-              }
-            }
-          } else {
-            // Gemini API调用
-            const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
-            const model = genAI.getGenerativeModel({
-              // model: "gemini-2.0-flash-exp",
-              model: "gemini-2.5-flash",
-              generationConfig,
-            });
-
-            const imagePart = {
-              inlineData: {
-                data: imageData.split(',')[1],
-                mimeType: file.type
-              },
-            };
-
-            const result = await model.generateContentStream([
-              "请识别图片中的文字内容，严格按照以下规则输出：" +
-              "1. 数学公式规范：" +
-              "   - 独立成行的公式使用 $$...$$" +
-              "   - 行内变量和表达式使用 $...$ 包裹" +
-              "   - 保持原文中的变量名称不变" +           
-              "2. 示例：" +
-              "   - 原文：'当 n 为偶数时'" +
-              "   - 正确输出：'当 $n$ 为偶数时'" +
-              "   - 错误输出：'当 Tn 为偶数时' 或 '当 @n@ 为偶数时'" +
-              "3. 文字识别要求：" +
-              "   - 如遇到模糊不清的单词或中文，根据上下文语境进行合理推测和修正" +
-              "   - 保持语句通顺和语义连贯性" +
-              "   - 专业术语和特定名词需要准确识别" +
-              "4. 直接输出内容，不要添加任何说明",
-              imagePart
-            ]);
-
-            for await (const chunk of result.stream) {
-              const chunkText = chunk.text();
-              fullText += chunkText;
-              
-              // 更新这一页的streaming文本
-              setStreamingTexts(prev => ({ ...prev, [index]: fullText }));
-              
-              // 更新结果数组
-              setResults(prevResults => {
-                const newResults = [...prevResults];
-                newResults[index] = fullText;
-                return newResults;
-              });
-            }
           }
-        }
+        });
 
         // 在设置结果之前预处理文本
         fullText = preprocessText(fullText);
@@ -556,6 +579,7 @@ function App() {
           newResults[index] = fullText;
           return newResults;
         });
+        setStreamingStates(prev => ({ ...prev, [index]: false }));
         
         return fullText;
 
@@ -1002,71 +1026,11 @@ function App() {
     setIsCorrectingText(true);
     try {
       const prompt = CORRECTION_PROMPT.replace('{content}', results[currentIndex]);
-      
-      if (modelType === 'openai') {
-        const response = await fetch('https://zangaaa-g2api.hf.space/hf/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer 26e72514-58a7-47fd-b40d-12daef4aec32'
-          },
-          body: JSON.stringify({
-            model: "gemini-1.5-flash-latest",
-            messages: [
-              {
-                role: "user",
-                content: prompt
-              }
-            ],
-            max_tokens: 8000,
-            stream: true
-          })
-        });
+      let correctedText = '';
 
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let correctedText = '';
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          const chunk = decoder.decode(value);
-          const lines = chunk.split('\n');
-          
-          for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                const content = data.choices?.[0]?.delta?.content || '';
-                if (content) {
-                  correctedText += content;
-                  setResults(prev => {
-                    const newResults = [...prev];
-                    newResults[currentIndex] = correctedText;
-                    return newResults;
-                  });
-                }
-              } catch (e) {
-                console.error('Error parsing chunk:', e);
-              }
-            }
-          }
-        }
-      } else {
-        // Gemini API 调用
-        const genAI = new GoogleGenerativeAI(process.env.REACT_APP_GEMINI_API_KEY);
-        const model = genAI.getGenerativeModel({
-          // model: "gemini-2.0-flash-exp",
-          model: "gemini-2.5-flash",
-          generationConfig,
-        });
-
-        const result = await model.generateContentStream([prompt]);
-        let correctedText = '';
-
-        for await (const chunk of result.stream) {
-          const chunkText = chunk.text();
+      await streamGeminiContent({
+        prompt,
+        onTextChunk: (chunkText) => {
           correctedText += chunkText;
           setResults(prev => {
             const newResults = [...prev];
@@ -1074,7 +1038,7 @@ function App() {
             return newResults;
           });
         }
-      }
+      });
     } catch (error) {
       console.error('纠错过程出错:', error);
     } finally {
@@ -1099,17 +1063,7 @@ function App() {
         <h1>高精度OCR识别</h1>
         <p>
           {isMobile ? '上传图片、PDF即刻识别文字内容' : (
-            <>
-              智能识别多国语言及手写体、表格、结构化抽取、数学公式，上传或拖拽图片、pdf即刻识别文字内容，使用的gala佬的api，便宜够快 {' '}
-              <a 
-                href="https://gala.chataiapi.com" 
-                target="_blank" 
-                rel="noopener noreferrer"
-                style={{ color: '#1890ff', textDecoration: 'underline' }}
-              >
-                https://gala.chataiapi.com
-              </a>
-            </>
+            '智能识别多国语言及手写体、表格、结构化抽取、数学公式，上传或拖拽图片、pdf 即刻识别文字内容，默认使用 Gemini 原生流式接口'
           )}
         </p>
       </header>
@@ -1147,6 +1101,37 @@ function App() {
                   {showUrlInput ? '取消' : '使用链接'}
                 </button>
               )}
+            </div>
+
+            <div className="api-config-panel">
+              <div className="api-config-title">Gemini 配置（留空回落到环境变量）</div>
+              <div className="api-config-grid">
+                <input
+                  type="url"
+                  value={apiUrlConfig}
+                  onChange={(e) => setApiUrlConfig(e.target.value)}
+                  placeholder="Gemini API URL"
+                  className="api-config-input"
+                />
+                <input
+                  type="password"
+                  value={apiKeyConfig}
+                  onChange={(e) => setApiKeyConfig(e.target.value)}
+                  placeholder="Gemini API Key"
+                  className="api-config-input"
+                  autoComplete="off"
+                />
+                <input
+                  type="text"
+                  value={modelConfig}
+                  onChange={(e) => setModelConfig(e.target.value)}
+                  placeholder="模型名称（如 gemini-2.5-flash）"
+                  className="api-config-input"
+                />
+              </div>
+              <p className="api-config-hint">
+                当前默认值：URL {envGeminiApiUrl}，Model {envGeminiModel}
+              </p>
             </div>
             
             {showUrlInput && !isMobile && (
