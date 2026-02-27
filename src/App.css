@@ -659,22 +659,38 @@ main.has-content {
   transform: translateY(-2px);
 }
 
-.config-trigger-button {
+.settings-link {
+  position: fixed;
+  top: 1rem;
+  right: 3.75rem;
+  z-index: 1000;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
   background: transparent;
   color: #1d1d1f;
-  padding: 1rem 1.6rem;
-  border-radius: 99px;
-  font-size: 1rem;
-  font-weight: 600;
-  border: 2px solid rgba(29, 29, 31, 0.22);
-  transition: all 0.3s ease;
+  opacity: 0.82;
   cursor: pointer;
+  transition: all 0.3s ease;
 }
 
-.config-trigger-button:hover {
-  background: rgba(29, 29, 31, 0.07);
-  transform: translateY(-2px);
-  border-color: rgba(29, 29, 31, 0.4);
+.settings-link svg {
+  width: 30px;
+  height: 30px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.settings-link:hover {
+  transform: scale(1.1);
+  color: #0071e3;
+  opacity: 1;
 }
 
 .api-config-grid {
@@ -878,11 +894,35 @@ main.has-content {
   animation: scaleIn 0.3s ease-out;
 }
 
+.config-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
 .config-modal-content {
   width: min(560px, calc(100vw - 2rem));
   max-height: 88vh;
   overflow-y: auto;
   padding: 1.1rem 1rem 1rem;
+}
+
+.config-modal-content .modal-close {
+  top: 0.65rem;
+  right: 0.65rem;
+  width: 32px;
+  height: 32px;
+  font-size: 20px;
+  border: 1px solid #e5e5e5;
+  box-shadow: none;
 }
 
 .config-modal-title {

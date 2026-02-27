@@ -882,6 +882,18 @@ function App() {
   return (
     <div className="app">
       <header>
+        <button
+          type="button"
+          className="settings-link"
+          aria-label="打开 API 配置"
+          onClick={() => setShowConfigModal(true)}
+          style={{ display: isMobile ? 'none' : 'flex' }}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M10.325 4.317a1 1 0 0 1 1.35-.936l.664.286a1 1 0 0 0 .79 0l.664-.286a1 1 0 0 1 1.35.936l.081.72a1 1 0 0 0 .596.804l.663.287a1 1 0 0 1 .55 1.31l-.286.663a1 1 0 0 0 0 .79l.286.663a1 1 0 0 1-.55 1.31l-.663.287a1 1 0 0 0-.596.804l-.081.72a1 1 0 0 1-1.35.936l-.664-.286a1 1 0 0 0-.79 0l-.664.286a1 1 0 0 1-1.35-.936l-.081-.72a1 1 0 0 0-.596-.804l-.663-.287a1 1 0 0 1-.55-1.31l.286-.663a1 1 0 0 0 0-.79l-.286-.663a1 1 0 0 1 .55-1.31l.663-.287a1 1 0 0 0 .596-.804l.081-.72z" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
         <a 
           href="https://github.com/CiZaii" 
           target="_blank" 
@@ -934,13 +946,6 @@ function App() {
                   {showUrlInput ? '取消' : '使用链接'}
                 </button>
               )}
-              <button
-                type="button"
-                className="config-trigger-button"
-                onClick={() => setShowConfigModal(true)}
-              >
-                API 配置
-              </button>
             </div>
             
             {showUrlInput && !isMobile && (
@@ -1041,7 +1046,7 @@ function App() {
       )}
 
       {showConfigModal && (
-        <div className="modal-overlay" onClick={handleCloseConfigModal}>
+        <div className="config-modal-overlay" onClick={handleCloseConfigModal}>
           <div className="modal-content config-modal-content" onClick={e => e.stopPropagation()}>
             <button className="modal-close" onClick={handleCloseConfigModal}>×</button>
             <h2 className="config-modal-title">Gemini API 配置</h2>
