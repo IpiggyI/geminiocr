@@ -1048,24 +1048,57 @@ function App() {
       {showConfigModal && (
         <div className="config-modal-overlay" onClick={handleCloseConfigModal}>
           <div className="modal-content config-modal-content" onClick={e => e.stopPropagation()}>
-            <button className="modal-close" onClick={handleCloseConfigModal}>×</button>
-            <h2 className="config-modal-title">Gemini API 配置</h2>
+            <button className="modal-close" onClick={handleCloseConfigModal} aria-label="关闭">×</button>
+
+            {/* Step 4: 渐变标题 + 齿轮图标 */}
+            <h2 className="config-modal-title">
+              <svg className="config-title-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="gearGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#0071e3"/>
+                    <stop offset="100%" stopColor="#6200ff"/>
+                  </linearGradient>
+                </defs>
+                <path d="M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" stroke="url(#gearGrad)" strokeWidth="1.5"/>
+                <path d="M13.765 2.152C13.398 2 12.932 2 12 2c-.932 0-1.398 0-1.765.152a2 2 0 0 0-1.083 1.083c-.092.223-.129.484-.143.863a1.617 1.617 0 0 1-.79 1.353 1.617 1.617 0 0 1-1.567.008c-.336-.178-.579-.276-.82-.308a2 2 0 0 0-1.478.396C4.04 5.79 3.806 6.206 3.34 7.04c-.466.834-.7 1.25-.709 1.636a2 2 0 0 0 .396 1.278c.143.19.356.363.658.614.527.437.79.655.916.93a1.617 1.617 0 0 1 0 1.004c-.127.275-.39.493-.916.93-.302.25-.515.423-.658.614a2 2 0 0 0-.396 1.278c.01.387.243.803.709 1.636.466.834.7 1.25 1.014 1.493a2 2 0 0 0 1.479.396c.24-.032.483-.13.819-.308a1.617 1.617 0 0 1 1.567.008c.483.28.77.795.79 1.353.014.38.051.64.143.863a2 2 0 0 0 1.083 1.083C10.602 22 11.068 22 12 22c.932 0 1.398 0 1.765-.152a2 2 0 0 0 1.083-1.083c.092-.223.129-.484.143-.863.02-.558.307-1.074.79-1.353a1.617 1.617 0 0 1 1.567-.008c.336.178.579.276.819.308a2 2 0 0 0 1.479-.396c.314-.244.548-.66 1.014-1.493.466-.834.7-1.25.709-1.636a2 2 0 0 0-.396-1.278c-.143-.19-.356-.363-.658-.614-.527-.437-.79-.655-.916-.93a1.617 1.617 0 0 1 0-1.004c.127-.275.39-.493.916-.93.302-.25.515-.423.658-.614a2 2 0 0 0 .396-1.278c-.01-.387-.243-.803-.709-1.636-.466-.834-.7-1.25-1.014-1.493a2 2 0 0 0-1.479-.396c-.24.032-.483.13-.819.308a1.617 1.617 0 0 1-1.567-.008 1.617 1.617 0 0 1-.79-1.353c-.014-.38-.051-.64-.143-.863a2 2 0 0 0-1.083-1.083Z" stroke="url(#gearGrad)" strokeWidth="1.5"/>
+              </svg>
+              Gemini API 配置
+            </h2>
             <p className="config-modal-subtitle">页面填写优先生效；留空时自动回落到环境变量。</p>
 
+            {/* Step 5: 卡片式字段 + 状态 Badge */}
             <div className="api-config-grid">
-              <label className="config-field">
-                <span className="config-field-label">API URL</span>
+              {/* API URL 字段 */}
+              <label className={`config-field${apiUrlConfig ? ' config-field--custom' : ''}`}>
+                <div className="config-field-header">
+                  <div className="config-field-header-left">
+                    <svg className="config-field-icon" viewBox="0 0 16 16" fill="none"><path d="M6.5 10.5L4.5 12.5a2.121 2.121 0 1 1-3-3l2-2M9.5 5.5l2-2a2.121 2.121 0 1 1 3 3l-2 2M5.5 10.5l5-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+                    <span className="config-field-label">API URL</span>
+                  </div>
+                  <span className={`config-field-badge ${apiUrlConfig ? 'config-field-badge--custom' : 'config-field-badge--env'}`}>
+                    {apiUrlConfig ? '自定义' : '环境变量'}
+                  </span>
+                </div>
                 <input
                   type="url"
                   value={apiUrlConfig}
                   onChange={(e) => setApiUrlConfig(e.target.value)}
-                  placeholder="https://generativelanguage.googleapis.com/v1beta"
+                  placeholder={envGeminiApiUrl || 'https://generativelanguage.googleapis.com/v1beta'}
                   className="api-config-input"
                 />
               </label>
 
-              <label className="config-field">
-                <span className="config-field-label">API Key</span>
+              {/* API Key 字段 */}
+              <label className={`config-field${apiKeyConfig ? ' config-field--custom' : ''}`}>
+                <div className="config-field-header">
+                  <div className="config-field-header-left">
+                    <svg className="config-field-icon" viewBox="0 0 16 16" fill="none"><path d="M10 6a2.5 2.5 0 1 0-1.586 2.329L10 10h1.5v1.5H13V10h1V8.5h-4.586A2.49 2.49 0 0 0 10 6Zm-2.5 1a1 1 0 1 1 0-2 1 1 0 0 1 0 2Z" fill="currentColor"/></svg>
+                    <span className="config-field-label">API Key</span>
+                  </div>
+                  <span className={`config-field-badge ${apiKeyConfig ? 'config-field-badge--custom' : 'config-field-badge--env'}`}>
+                    {apiKeyConfig ? '自定义' : '环境变量'}
+                  </span>
+                </div>
                 <input
                   type="password"
                   value={apiKeyConfig}
@@ -1076,21 +1109,44 @@ function App() {
                 />
               </label>
 
-              <label className="config-field">
-                <span className="config-field-label">Model</span>
+              {/* Model 字段 */}
+              <label className={`config-field${modelConfig ? ' config-field--custom' : ''}`}>
+                <div className="config-field-header">
+                  <div className="config-field-header-left">
+                    <svg className="config-field-icon" viewBox="0 0 16 16" fill="none"><rect x="1" y="4" width="14" height="8" rx="2" stroke="currentColor" strokeWidth="1.3"/><circle cx="5" cy="8" r="1" fill="currentColor"/><circle cx="8" cy="8" r="1" fill="currentColor"/><circle cx="11" cy="8" r="1" fill="currentColor"/></svg>
+                    <span className="config-field-label">Model</span>
+                  </div>
+                  <span className={`config-field-badge ${modelConfig ? 'config-field-badge--custom' : 'config-field-badge--env'}`}>
+                    {modelConfig ? '自定义' : '环境变量'}
+                  </span>
+                </div>
                 <input
                   type="text"
                   value={modelConfig}
                   onChange={(e) => setModelConfig(e.target.value)}
-                  placeholder="gemini-2.5-flash"
+                  placeholder={envGeminiModel || 'gemini-2.5-flash'}
                   className="api-config-input"
                 />
               </label>
             </div>
 
-            <p className="api-config-hint">
-              环境默认值：URL {envGeminiApiUrl}，Model {envGeminiModel}
-            </p>
+            {/* Step 6: 环境默认值 — 结构化信息卡片 */}
+            <div className="api-config-hint">
+              <div className="api-config-hint-header">
+                <svg className="api-config-hint-icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="1.2"/><path d="M8 7v4M8 5.5v.01" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+                环境变量默认值
+              </div>
+              <div className="api-config-hint-items">
+                <div className="api-config-hint-item">
+                  <span className="api-config-hint-item-label">URL</span>
+                  <span className="api-config-hint-item-value" title={envGeminiApiUrl}>{envGeminiApiUrl || '未设置'}</span>
+                </div>
+                <div className="api-config-hint-item">
+                  <span className="api-config-hint-item-label">Model</span>
+                  <span className="api-config-hint-item-value" title={envGeminiModel}>{envGeminiModel || '未设置'}</span>
+                </div>
+              </div>
+            </div>
 
             <div className="config-modal-actions">
               <button
