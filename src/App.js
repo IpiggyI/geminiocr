@@ -32,6 +32,7 @@ const plugins = [
 
 const DEFAULT_GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
+const TRANSLATE_LANGUAGES = ['中文', '英语', '日语', '韩语', '法语', '德语', '西班牙语', '俄语'];
 
 // 添加 generationConfig 配置
 const generationConfig = {
@@ -163,6 +164,8 @@ function App() {
   const [apiKeyConfig, setApiKeyConfig] = useState('');
   const [modelConfig, setModelConfig] = useState('');
   const [isCorrectingText, setIsCorrectingText] = useState(false);
+  const [translateEnabled, setTranslateEnabled] = useState(false);
+  const [translateLang, setTranslateLang] = useState('中文');
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   const envGeminiApiUrl = process.env.REACT_APP_GEMINI_API_URL || DEFAULT_GEMINI_API_URL;
@@ -397,8 +400,13 @@ function App() {
           fileReader.readAsDataURL(file);
         });
 
+        let finalPrompt = OCR_PROMPT;
+        if (translateEnabled && translateLang.trim()) {
+          finalPrompt += `\n\n请在完成文字识别后，将识别结果翻译成${translateLang.trim()}，只输出翻译后的内容。`;
+        }
+
         await streamGeminiContent({
-          prompt: OCR_PROMPT,
+          prompt: finalPrompt,
           imageData: imageData.split(',')[1],
           mimeType: file.type,
           onTextChunk: (chunkText) => {
@@ -1130,6 +1138,39 @@ function App() {
               </label>
             </div>
 
+            {/* 翻译设置 */}
+            <label className="config-field" style={{ marginTop: '12px' }}>
+              <div className="config-field-header">
+                <div className="config-field-header-left">
+                  <svg className="config-field-icon" viewBox="0 0 16 16" fill="none"><path d="M2 3h5M4.5 3v8M7 5c0 3-2.5 6-5 6M3 8c1.5 1.5 4 2 5.5 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M9 14l2.5-7L14 14M9.8 12h4.4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  <span className="config-field-label">识别后自动翻译</span>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={translateEnabled}
+                  onChange={(e) => setTranslateEnabled(e.target.checked)}
+                  style={{ width: '16px', height: '16px', cursor: 'pointer' }}
+                />
+              </div>
+              {translateEnabled && (
+                <>
+                  <input
+                    type="text"
+                    list="translate-lang-list"
+                    value={translateLang}
+                    onChange={(e) => setTranslateLang(e.target.value)}
+                    placeholder="输入或选择目标语言"
+                    className="api-config-input"
+                  />
+                  <datalist id="translate-lang-list">
+                    {TRANSLATE_LANGUAGES.map(lang => (
+                      <option key={lang} value={lang} />
+                    ))}
+                  </datalist>
+                </>
+              )}
+            </label>
+
             {/* Step 6: 环境默认值 — 结构化信息卡片 */}
             <div className="api-config-hint">
               <div className="api-config-hint-header">
@@ -1156,6 +1197,8 @@ function App() {
                   setApiUrlConfig('');
                   setApiKeyConfig('');
                   setModelConfig('');
+                  setTranslateEnabled(false);
+                  setTranslateLang('中文');
                 }}
               >
                 清空并回落环境变量
