@@ -722,13 +722,22 @@ main.has-content {
   border-color: rgba(0, 0, 0, 0.06);
 }
 
-/* 自定义值激活态 — 左侧渐变边框条 */
+/* 自定义值激活态 — 左侧渐变边框条（伪元素避免 border-image 破坏圆角） */
 .config-field--custom {
   background: rgba(0, 113, 227, 0.04);
   border-color: rgba(0, 113, 227, 0.12);
-  box-shadow: inset 3px 0 0 0 transparent;
-  border-left: 3px solid;
-  border-image: linear-gradient(180deg, #0071e3, #6200ff) 1;
+  position: relative;
+  overflow: hidden;
+}
+
+.config-field--custom::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(180deg, #0071e3, #6200ff);
 }
 
 .config-field-header {
