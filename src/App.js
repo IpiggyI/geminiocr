@@ -166,6 +166,10 @@ function App() {
   const [isCorrectingText, setIsCorrectingText] = useState(false);
   const [translateEnabled, setTranslateEnabled] = useState(false);
   const [translateLang, setTranslateLang] = useState('中文');
+  const translateEnabledRef = useRef(false);
+  const translateLangRef = useRef('中文');
+  useEffect(() => { translateEnabledRef.current = translateEnabled; }, [translateEnabled]);
+  useEffect(() => { translateLangRef.current = translateLang; }, [translateLang]);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
   const envGeminiApiUrl = process.env.REACT_APP_GEMINI_API_URL || DEFAULT_GEMINI_API_URL;
@@ -401,8 +405,8 @@ function App() {
         });
 
         let finalPrompt = OCR_PROMPT;
-        if (translateEnabled && translateLang.trim()) {
-          finalPrompt += `\n\n请在完成文字识别后，将识别结果翻译成${translateLang.trim()}，只输出翻译后的内容。`;
+        if (translateEnabledRef.current && translateLangRef.current.trim()) {
+          finalPrompt += `\n\n请在完成文字识别后，将识别结果翻译成${translateLangRef.current.trim()}，只输出翻译后的内容。`;
         }
 
         await streamGeminiContent({
