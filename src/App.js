@@ -10,6 +10,9 @@ import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import './App.css';
 import { useOcrSession } from './hooks/useOcrSession';
+import { isTauri } from './desktop/tauriBridge';
+import { initDesktopShortcut } from './desktop/shortcutBootstrap';
+import { clipboardImageToFile } from './desktop/clipboardImageToFile';
 
 // 配置 ByteMD 插件
 const plugins = [
@@ -68,6 +71,25 @@ function App() {
   const [showModal, setShowModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  // 桌面端：全局快捷键 → 剪贴板图片 → 自动 OCR
+  useEffect(() => {
+    if (!isTauri()) return;
+
+    let cleanup;
+    initDesktopShortcut(async () => {
+      const file = await clipboardImageToFile();
+      if (file) {
+        ocr.processClipboardImage(file);
+      } else {
+        // 剪贴板无图片时提示
+        alert('剪贴板中没有图片，请先截图或复制图片');
+      }
+    }).then((unlisten) => { cleanup = unlisten; });
+
+    return () => { if (cleanup) cleanup(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 添加检测移动设备的 useEffect
   useEffect(() => {

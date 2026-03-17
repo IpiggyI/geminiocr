@@ -1,0 +1,14 @@
+{
+  "identifier": "main-capability",
+  "description": "Main window permissions for OCR desktop app",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-is-registered",
+    "clipboard-manager:allow-read-image",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text"
+  ]
+}

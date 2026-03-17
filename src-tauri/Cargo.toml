@@ -1,0 +1,24 @@
+[package]
+name = "geminiocr"
+version = "0.1.0"
+description = "Desktop OCR powered by Gemini"
+authors = ["CiZaii"]
+license = ""
+repository = ""
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "geminiocr_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde_json = "1"
+serde = { version = "1", features = ["derive"] }
+log = "0.4"
+tauri = { version = "2", features = [] }
+tauri-plugin-global-shortcut = "2"
+tauri-plugin-clipboard-manager = "2"
