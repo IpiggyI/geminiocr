@@ -9,12 +9,7 @@ import 'bytemd/dist/index.css';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import './App.css';
-import { DEFAULT_GEMINI_API_URL, DEFAULT_GEMINI_MODEL, createRuntimeConfigResolver, buildGeminiEndpoint } from './lib/ocr/runtimeConfig';
-import { streamGeminiContent } from './lib/ocr/streamGeminiContent';
-import { recognizeImage } from './lib/ocr/recognizeImage';
-import { correctText } from './lib/ocr/correctText';
-import { dataUrlToFile } from './lib/files/dataUrlToFile';
-import { pdfToImageDataUrls } from './lib/pdf/pdfToImageDataUrls';
+import { useOcrSession } from './hooks/useOcrSession';
 
 // 配置 ByteMD 插件
 const plugins = [
@@ -41,10 +36,29 @@ const TRANSLATE_LANGUAGES = ['中文', '英语', '日语', '韩语', '法语', '
 
 
 function App() {
-  const [images, setImages] = useState([]);
-  const [results, setResults] = useState([]);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
+  const ocr = useOcrSession();
+  const {
+    images, setImages,
+    results, setResults,
+    currentIndex, setCurrentIndex,
+    isLoading, setIsLoading,
+    isCorrectingText,
+    translateEnabled, setTranslateEnabled,
+    translateLang, setTranslateLang,
+    apiUrlConfig, setApiUrlConfig,
+    apiKeyConfig, setApiKeyConfig,
+    modelConfig, setModelConfig,
+    callGeminiStream,
+    handleFile,
+    handleImageFile,
+    handlePdfFile,
+    uploadFiles,
+    correctCurrentText: handleCorrectText,
+    handlePrevImage,
+    handleNextImage,
+  } = ocr;
+
+  // UI-only state
   const [isDragging, setIsDragging] = useState(false);
   const [isDraggingGlobal, setIsDraggingGlobal] = useState(false);
   const resultRef = useRef(null);
@@ -53,31 +67,7 @@ function App() {
   const [imageUrl, setImageUrl] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
-  const [apiUrlConfig, setApiUrlConfig] = useState('');
-  const [apiKeyConfig, setApiKeyConfig] = useState('');
-  const [modelConfig, setModelConfig] = useState('');
-  const [isCorrectingText, setIsCorrectingText] = useState(false);
-  const [translateEnabled, setTranslateEnabled] = useState(false);
-  const [translateLang, setTranslateLang] = useState('中文');
-  const translateEnabledRef = useRef(false);
-  const translateLangRef = useRef('中文');
-  useEffect(() => { translateEnabledRef.current = translateEnabled; }, [translateEnabled]);
-  useEffect(() => { translateLangRef.current = translateLang; }, [translateLang]);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-
-  const resolveConfig = createRuntimeConfigResolver({
-    envConfig: {
-      apiUrl: process.env.REACT_APP_GEMINI_API_URL || DEFAULT_GEMINI_API_URL,
-      apiKey: process.env.REACT_APP_GEMINI_API_KEY || '',
-      model: process.env.REACT_APP_GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
-    },
-  });
-
-  const callGeminiStream = async ({ prompt, imageData, mimeType, onTextChunk }) => {
-    const { apiUrl, apiKey, model } = resolveConfig({ apiUrlConfig, apiKeyConfig, modelConfig });
-    const endpoint = buildGeminiEndpoint(apiUrl, model, apiKey);
-    return streamGeminiContent({ endpoint, prompt, imageData, mimeType, onTextChunk });
-  };
 
   // 添加检测移动设备的 useEffect
   useEffect(() => {
@@ -138,192 +128,9 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [images.length]);
 
-  // 修改文件处理逻辑
-  const handleFile = async (file, index) => {
-    try {
-      let content = '';
-      
-      // 根据文件类型选择处理方法
-      if (file.type === 'application/pdf') {
-        content = await handlePdfFile(file, index);
-      } else if (file.type.startsWith('image/')) {
-        content = await handleImageFile(file, index);
-      } else {
-        throw new Error('不支持的文件类型');
-      }
-
-      if (index >= 0 && !file.type.startsWith('application/pdf')) {
-        setResults(prev => {
-          const newResults = [...prev];
-          newResults[index] = content;
-          return newResults;
-        });
-      }
-
-    } catch (error) {
-      console.error('处理文件时出错:', error);
-      if (index >= 0) {
-        setResults(prev => {
-          const newResults = [...prev];
-          newResults[index] = `处理出错: ${error.message}`;
-          return newResults;
-        });
-      }
-    }
-  };
-
-  // 处理图片文件
-  const handleImageFile = async (file, index) => {
-    if (!file || !file.type.startsWith('image/')) return;
-    try {
-      let liveText = '';
-      const fullText = await recognizeImage({
-        file,
-        translateLang: translateEnabledRef.current ? translateLangRef.current : '',
-        streamClient: callGeminiStream,
-        onTextChunk: (chunk) => {
-          liveText += chunk;
-          setResults(prev => {
-            const newResults = [...prev];
-            newResults[index] = liveText;
-            return newResults;
-          });
-        },
-      });
-
-      setResults(prev => {
-        const newResults = [...prev];
-        newResults[index] = fullText;
-        return newResults;
-      });
-      return fullText;
-    } catch (error) {
-      console.error('Error details:', error);
-      const errorMessage = `识别出错,请重试 (${error.message})`;
-      setResults(prev => {
-        const newResults = [...prev];
-        newResults[index] = errorMessage;
-        return newResults;
-      });
-      throw error;
-    }
-  };
-
-  // PDF 文件处理：转图片 → 批量 OCR
-  const handlePdfFile = async (file, startIndex) => {
-    try {
-      const pdfImages = await pdfToImageDataUrls(file);
-
-      // 更新图片预览
-      setImages(prev => {
-        const newImages = [...prev];
-        newImages.splice(startIndex, 1, ...pdfImages);
-        return newImages;
-      });
-
-      // 初始化结果数组
-      setResults(prev => {
-        const newResults = [...prev];
-        newResults.splice(startIndex, 1, ...new Array(pdfImages.length).fill('正在识别中...'));
-        return newResults;
-      });
-
-      // 批量识别，每批 6 页
-      const batchSize = 6;
-      const allResults = [];
-
-      for (let i = 0; i < pdfImages.length; i += batchSize) {
-        try {
-          const batch = pdfImages.slice(i, i + batchSize);
-          const batchPromises = batch.map(async (imgDataUrl, batchIndex) => {
-            const pageIndex = i + batchIndex;
-            try {
-              const imageFile = await dataUrlToFile(imgDataUrl, `page_${pageIndex + 1}.jpg`, 'image/jpeg');
-              return handleImageFile(imageFile, startIndex + pageIndex);
-            } catch (error) {
-              console.error(`处理PDF第 ${pageIndex + 1} 页图片时出错:`, error);
-              return `第 ${pageIndex + 1} 页处理失败: ${error.message}`;
-            }
-          });
-
-          const batchResults = await Promise.allSettled(batchPromises);
-          allResults.push(...batchResults.map(r =>
-            r.status === 'fulfilled' ? r.value : `处理失败: ${r.reason}`
-          ));
-        } catch (batchError) {
-          console.error('处理PDF批次时出错:', batchError);
-        }
-      }
-
-      return allResults.filter(Boolean).join('\n\n---\n\n');
-    } catch (error) {
-      console.error('PDF处理错误:', error);
-      throw new Error(`PDF处理失败: ${error.message}`);
-    }
-  };
-
-  // 添加并发控制函数
-  const concurrentProcess = async (items, processor, maxConcurrent = 5) => {
-    const results = [];
-    for (let i = 0; i < items.length; i += maxConcurrent) {
-      const chunk = items.slice(i, i + maxConcurrent);
-      const chunkPromises = chunk.map((item, index) => processor(item, i + index));
-      const chunkResults = await Promise.all(chunkPromises);
-      results.push(...chunkResults);
-    }
-    return results;
-  };
-
-  // 修改文件上传处理
+  // 文件上传处理 — 委托给 useOcrSession
   const handleImageUpload = async (e) => {
-    const files = Array.from(e.target.files);
-    setIsLoading(true);
-    
-    try {
-      const startIndex = images.length;
-      
-      // 处理所有支持的文件类型
-      const validFiles = files.filter(file => 
-        file.type.startsWith('image/') || file.type === 'application/pdf'
-      );
-
-      // 生成预览
-      const previews = await Promise.all(validFiles.map(async file => {
-        if (file.type.startsWith('image/')) {
-          return URL.createObjectURL(file);
-        } else if (file.type === 'application/pdf') {
-          // 为PDF创建临时预览
-          return '/pdf-icon.png';
-        }
-      }));
-
-      setImages(prev => [...prev, ...previews]);
-      setResults(prev => [...prev, ...new Array(validFiles.length).fill('')]);
-      setCurrentIndex(startIndex);
-
-      // 逐个处理文件
-      for (let i = 0; i < validFiles.length; i++) {
-        const file = validFiles[i];
-        await handleFile(file, startIndex + i);
-      }
-    } catch (error) {
-      console.error('处理文件时出错:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 修改图片切换函数
-  const handlePrevImage = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(prev => prev - 1);
-    }
-  };
-
-  const handleNextImage = () => {
-    if (currentIndex < images.length - 1) {
-      setCurrentIndex(prev => prev + 1);
-    }
+    await uploadFiles(Array.from(e.target.files));
   };
 
   // 添加全局拖拽事件监听
@@ -427,11 +234,13 @@ function App() {
       setImages(prev => [...prev, ...imageUrls]);
       setResults(prev => [...prev, ...new Array(files.length).fill('')]);
       setCurrentIndex(startIndex);
-      
-      await concurrentProcess(
-        files,
-        (file, index) => handleFile(file, startIndex + index)
-      );
+
+      // 逐批处理（最多 5 个并发）
+      const maxConcurrent = 5;
+      for (let i = 0; i < files.length; i += maxConcurrent) {
+        const batch = files.slice(i, i + maxConcurrent);
+        await Promise.all(batch.map((file, idx) => handleFile(file, startIndex + i + idx)));
+      }
     } catch (error) {
       console.error('Error processing dropped files:', error);
     } finally {
@@ -583,32 +392,6 @@ function App() {
         .catch(err => {
           console.error('复制失败:', err);
         });
-    }
-  };
-
-  // 添加纠错处理函数
-  const handleCorrectText = async () => {
-    if (!results[currentIndex] || isCorrectingText) return;
-
-    setIsCorrectingText(true);
-    try {
-      let liveText = '';
-      await correctText({
-        text: results[currentIndex],
-        streamClient: callGeminiStream,
-        onTextChunk: (chunk) => {
-          liveText += chunk;
-          setResults(prev => {
-            const newResults = [...prev];
-            newResults[currentIndex] = liveText;
-            return newResults;
-          });
-        },
-      });
-    } catch (error) {
-      console.error('纠错过程出错:', error);
-    } finally {
-      setIsCorrectingText(false);
     }
   };
 
