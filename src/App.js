@@ -10,6 +10,8 @@ import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import './App.css';
 import { pdfjs } from 'react-pdf';
+import { OCR_PROMPT, CORRECTION_PROMPT, appendTranslateInstruction } from './lib/ocr/prompts';
+import { preprocessText } from './lib/ocr/preprocessText';
 
 // 配置 ByteMD 插件
 const plugins = [
@@ -42,110 +44,8 @@ const generationConfig = {
   maxOutputTokens: 8192,
 };
 
-const OCR_PROMPT = `
-请识别图片中的文字内容，注意以下要求：
 
-1. 数学公式规范：
-   - 独立的数学公式使用 $$，不要添加额外的换行符
-   - 行内数学公式使用 $，与文字之间需要空格
-   - 保持原文中的变量名称不变
 
-2. 格式要求：
-   - 每个独立公式单独成行
-   - 公式与公式之间要有换行分隔
-   - 公式与文字之间要有空格分隔
-   - 保持原文的段落结构
-
-3. 示例格式：
-   这是一个行内公式 $x^2$ 的例子
-
-   这是一个独立公式：
-   $$f(x) = x^2 + 1$$
-
-   这是下一段文字...
-
-4. 特别注意：
-   - 不要省略任何公式或文字
-   - 保持原文的排版结构
-   - 确保公式之间有正确的分隔
-   - 序号和公式之间要有空格
-
-5. 如果图片中存在类似"表格"的内容，请使用标准 Markdown 表格语法输出。例如：
-   | DESCRIPTION    | RATE    | HOURS | AMOUNT   |
-   |---------------|---------|-------|----------|
-   | Copy Writing  | $50/hr  | 4     | $200.00  |
-   | Website Design| $50/hr  | 2     | $100.00  |   
-  5.1表头与单元格之间需使用"|-"分隔行，并保证每列至少有三个"-"进行对齐
-  5.2 金额部分需包含货币符号以及小数点
-  5.3 若识别到表格，也不能忽略表格外的文字
-  5.4 以上要求须综合运用，完整输出图片中全部文本信息
-请按照以上规范输出识别结果。
-`;
-
-// 修改预处理函数
-const preprocessText = (text) => {
-  if (!text) return '';
-  
-  // 临时保存表格内容
-  const tables = [];
-  text = text.replace(/(\|[^\n]+\|\n\|[-|\s]+\|\n\|[^\n]+\|(\n|$))+/g, (match) => {
-    tables.push(match);
-    return `__TABLE_${tables.length - 1}__`;
-  });
-  
-  // 标准化数学公式分隔符
-  text = text.replace(/\\\\\(/g, '$');
-  text = text.replace(/\\\\\)/g, '$');
-  text = text.replace(/\\\\\[/g, '$$');
-  text = text.replace(/\\\\\]/g, '$$');
-  
-  // 移除所有的 ``` 标记
-  text = text.replace(/```[\s\S]*?```/g, (match) => {
-    const content = match.slice(3, -3).trim();
-    return content;
-  });
-  
-  // 移除单独的 ``` 标记和语言标识
-  text = text.replace(/```\w*\n?/g, '');
-  
-  // 处理数字序号后的换行问题
-  text = text.replace(/(\d+)\.\s*\n+/g, '$1. ');
-  
-  // 处理块级公式的格式
-  text = text.replace(/\n*\$\$\s*([\s\S]*?)\s*\$\$\n*/g, (match, formula) => {
-    return `\n\n$$${formula.trim()}$$\n\n`;
-  });
-  
-  // 处理行内公式的格式
-  text = text.replace(/\$\s*(.*?)\s*\$/g, (match, formula) => {
-    return `$${formula.trim()}$`;
-  });
-  
-  // 处理数字序号和公式之间的格式
-  text = text.replace(/(\d+\.)\s*(\$\$[\s\S]*?\$\$)/g, '$1\n\n$2');
-  
-  // 处理多余的空行
-  text = text.replace(/\n{3,}/g, '\n\n');
-  
-  // 还原表格内容
-  text = text.replace(/__TABLE_(\d+)__/g, (match, index) => {
-    return tables[parseInt(index)];
-  });
-  
-  return text.trim();
-};
-
-// 添加纠错提示模板
-const CORRECTION_PROMPT = `请检查并纠正以下数学公式和文本内容中的错误，特别注意：
-1. LaTeX 公式语法
-2. 数学符号的正确性
-3. 格式排版的规范性
-5. 不要添加任何解释，直接输出修正后的内容
-6. 修正之后的数据一定是要可以正确解析的
-
-以下是需要检查的内容：
-{content}
-`;
 
 function App() {
   const [images, setImages] = useState([]);
@@ -405,8 +305,8 @@ function App() {
         });
 
         let finalPrompt = OCR_PROMPT;
-        if (translateEnabledRef.current && translateLangRef.current.trim()) {
-          finalPrompt += `\n\n请在完成文字识别后，将识别结果翻译成${translateLangRef.current.trim()}，只输出翻译后的内容。`;
+        if (translateEnabledRef.current) {
+          finalPrompt = appendTranslateInstruction(finalPrompt, translateLangRef.current);
         }
 
         await streamGeminiContent({
