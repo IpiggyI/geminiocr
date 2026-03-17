@@ -10,10 +10,10 @@ import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import './App.css';
 import { pdfjs } from 'react-pdf';
-import { OCR_PROMPT, CORRECTION_PROMPT, appendTranslateInstruction } from './lib/ocr/prompts';
-import { preprocessText } from './lib/ocr/preprocessText';
 import { DEFAULT_GEMINI_API_URL, DEFAULT_GEMINI_MODEL, createRuntimeConfigResolver, buildGeminiEndpoint } from './lib/ocr/runtimeConfig';
 import { streamGeminiContent } from './lib/ocr/streamGeminiContent';
+import { recognizeImage } from './lib/ocr/recognizeImage';
+import { correctText } from './lib/ocr/correctText';
 
 // 配置 ByteMD 插件
 const plugins = [
@@ -173,60 +173,38 @@ function App() {
 
   // 处理图片文件
   const handleImageFile = async (file, index) => {
-    if (file && file.type.startsWith('image/')) {
-      try {
-        let fullText = '';
+    if (!file || !file.type.startsWith('image/')) return;
+    try {
+      let liveText = '';
+      const fullText = await recognizeImage({
+        file,
+        translateLang: translateEnabledRef.current ? translateLangRef.current : '',
+        streamClient: callGeminiStream,
+        onTextChunk: (chunk) => {
+          liveText += chunk;
+          setResults(prev => {
+            const newResults = [...prev];
+            newResults[index] = liveText;
+            return newResults;
+          });
+        },
+      });
 
-        const fileReader = new FileReader();
-        const imageData = await new Promise((resolve) => {
-          fileReader.onloadend = () => {
-            resolve(fileReader.result);
-          };
-          fileReader.readAsDataURL(file);
-        });
-
-        let finalPrompt = OCR_PROMPT;
-        if (translateEnabledRef.current) {
-          finalPrompt = appendTranslateInstruction(finalPrompt, translateLangRef.current);
-        }
-
-        await callGeminiStream({
-          prompt: finalPrompt,
-          imageData: imageData.split(',')[1],
-          mimeType: file.type,
-          onTextChunk: (chunkText) => {
-            fullText += chunkText;
-            setResults(prevResults => {
-              const newResults = [...prevResults];
-              newResults[index] = fullText;
-              return newResults;
-            });
-          }
-        });
-
-        // 在设置结果之前预处理文本
-        fullText = preprocessText(fullText);
-
-        setResults(prevResults => {
-          const newResults = [...prevResults];
-          newResults[index] = fullText;
-          return newResults;
-        });
-        
-        return fullText;
-
-      } catch (error) {
-        console.error('Error details:', error);
-        const errorMessage = `识别出错,请重试 (${error.message})`;
-
-        setResults(prevResults => {
-          const newResults = [...prevResults];
-          newResults[index] = errorMessage;
-          return newResults;
-        });
-        
-        throw error;
-      }
+      setResults(prev => {
+        const newResults = [...prev];
+        newResults[index] = fullText;
+        return newResults;
+      });
+      return fullText;
+    } catch (error) {
+      console.error('Error details:', error);
+      const errorMessage = `识别出错,请重试 (${error.message})`;
+      setResults(prev => {
+        const newResults = [...prev];
+        newResults[index] = errorMessage;
+        return newResults;
+      });
+      throw error;
     }
   };
 
@@ -648,22 +626,21 @@ function App() {
   // 添加纠错处理函数
   const handleCorrectText = async () => {
     if (!results[currentIndex] || isCorrectingText) return;
-    
+
     setIsCorrectingText(true);
     try {
-      const prompt = CORRECTION_PROMPT.replace('{content}', results[currentIndex]);
-      let correctedText = '';
-
-      await callGeminiStream({
-        prompt,
-        onTextChunk: (chunkText) => {
-          correctedText += chunkText;
+      let liveText = '';
+      await correctText({
+        text: results[currentIndex],
+        streamClient: callGeminiStream,
+        onTextChunk: (chunk) => {
+          liveText += chunk;
           setResults(prev => {
             const newResults = [...prev];
-            newResults[currentIndex] = correctedText;
+            newResults[currentIndex] = liveText;
             return newResults;
           });
-        }
+        },
       });
     } catch (error) {
       console.error('纠错过程出错:', error);
