@@ -12,6 +12,8 @@ import './App.css';
 import { pdfjs } from 'react-pdf';
 import { OCR_PROMPT, CORRECTION_PROMPT, appendTranslateInstruction } from './lib/ocr/prompts';
 import { preprocessText } from './lib/ocr/preprocessText';
+import { DEFAULT_GEMINI_API_URL, DEFAULT_GEMINI_MODEL, createRuntimeConfigResolver, buildGeminiEndpoint } from './lib/ocr/runtimeConfig';
+import { streamGeminiContent } from './lib/ocr/streamGeminiContent';
 
 // 配置 ByteMD 插件
 const plugins = [
@@ -32,17 +34,7 @@ const plugins = [
   frontmatterPlugin()
 ];
 
-const DEFAULT_GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta';
-const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 const TRANSLATE_LANGUAGES = ['中文', '英语', '日语', '韩语', '法语', '德语', '西班牙语', '俄语'];
-
-// 添加 generationConfig 配置
-const generationConfig = {
-  temperature: 0,  // 降低随机性
-  topP: 1,
-  topK: 1,
-  maxOutputTokens: 8192,
-};
 
 
 
@@ -72,129 +64,18 @@ function App() {
   useEffect(() => { translateLangRef.current = translateLang; }, [translateLang]);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
 
-  const envGeminiApiUrl = process.env.REACT_APP_GEMINI_API_URL || DEFAULT_GEMINI_API_URL;
-  const envGeminiApiKey = process.env.REACT_APP_GEMINI_API_KEY || '';
-  const envGeminiModel = process.env.REACT_APP_GEMINI_MODEL || DEFAULT_GEMINI_MODEL;
+  const resolveConfig = createRuntimeConfigResolver({
+    envConfig: {
+      apiUrl: process.env.REACT_APP_GEMINI_API_URL || DEFAULT_GEMINI_API_URL,
+      apiKey: process.env.REACT_APP_GEMINI_API_KEY || '',
+      model: process.env.REACT_APP_GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
+    },
+  });
 
-  const getGeminiRuntimeConfig = () => {
-    const apiUrl = apiUrlConfig.trim() || envGeminiApiUrl;
-    const apiKey = apiKeyConfig.trim() || envGeminiApiKey;
-    const model = (modelConfig.trim() || envGeminiModel).replace(/^models\//, '');
-
-    if (!apiKey) {
-      throw new Error('缺少 Gemini API Key，请在页面配置或环境变量 REACT_APP_GEMINI_API_KEY 中设置');
-    }
-
-    return { apiUrl, apiKey, model };
-  };
-
-  const buildGeminiEndpoint = (apiUrl, model, apiKey) => {
-    const normalizedUrl = apiUrl.replace(/\/+$/, '');
-
-    if (normalizedUrl.includes(':streamGenerateContent')) {
-      const hasQuery = normalizedUrl.includes('?');
-      const withAlt = /[?&]alt=/.test(normalizedUrl)
-        ? normalizedUrl
-        : `${normalizedUrl}${hasQuery ? '&' : '?'}alt=sse`;
-      return /[?&]key=/.test(withAlt)
-        ? withAlt
-        : `${withAlt}&key=${encodeURIComponent(apiKey)}`;
-    }
-
-    return `${normalizedUrl}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse&key=${encodeURIComponent(apiKey)}`;
-  };
-
-  const extractGeminiChunkText = (payload) =>
-    (payload.candidates || [])
-      .flatMap((candidate) => candidate?.content?.parts || [])
-      .map((part) => part?.text || '')
-      .join('');
-
-  const streamGeminiContent = async ({ prompt, imageData, mimeType, onTextChunk }) => {
-    const { apiUrl, apiKey, model } = getGeminiRuntimeConfig();
+  const callGeminiStream = async ({ prompt, imageData, mimeType, onTextChunk }) => {
+    const { apiUrl, apiKey, model } = resolveConfig({ apiUrlConfig, apiKeyConfig, modelConfig });
     const endpoint = buildGeminiEndpoint(apiUrl, model, apiKey);
-    const parts = [{ text: prompt }];
-
-    if (imageData && mimeType) {
-      parts.push({
-        inline_data: {
-          data: imageData,
-          mime_type: mimeType
-        }
-      });
-    }
-
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts
-          }
-        ],
-        generationConfig
-      })
-    });
-
-    if (!response.ok) {
-      let errorDetail = '';
-      try {
-        const errorBody = await response.json();
-        errorDetail = errorBody?.error?.message || JSON.stringify(errorBody);
-      } catch (error) {
-        errorDetail = await response.text();
-      }
-      throw new Error(`Gemini API 请求失败 (${response.status}): ${errorDetail || response.statusText}`);
-    }
-
-    if (!response.body) {
-      throw new Error('Gemini API 未返回可读取的流式响应');
-    }
-
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    let buffer = '';
-
-    const consumeLine = (line) => {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith('data:')) {
-        return;
-      }
-      const rawPayload = trimmed.slice(5).trim();
-      if (!rawPayload || rawPayload === '[DONE]') {
-        return;
-      }
-
-      try {
-        const payload = JSON.parse(rawPayload);
-        const chunkText = extractGeminiChunkText(payload);
-        if (chunkText) {
-          onTextChunk(chunkText);
-        }
-      } catch (error) {
-        console.error('Gemini SSE 数据解析失败:', error);
-      }
-    };
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) {
-        break;
-      }
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
-      lines.forEach(consumeLine);
-    }
-
-    if (buffer.trim()) {
-      consumeLine(buffer);
-    }
+    return streamGeminiContent({ endpoint, prompt, imageData, mimeType, onTextChunk });
   };
 
   // 添加检测移动设备的 useEffect
@@ -309,7 +190,7 @@ function App() {
           finalPrompt = appendTranslateInstruction(finalPrompt, translateLangRef.current);
         }
 
-        await streamGeminiContent({
+        await callGeminiStream({
           prompt: finalPrompt,
           imageData: imageData.split(',')[1],
           mimeType: file.type,
@@ -773,7 +654,7 @@ function App() {
       const prompt = CORRECTION_PROMPT.replace('{content}', results[currentIndex]);
       let correctedText = '';
 
-      await streamGeminiContent({
+      await callGeminiStream({
         prompt,
         onTextChunk: (chunkText) => {
           correctedText += chunkText;
