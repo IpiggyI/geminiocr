@@ -445,7 +445,9 @@ function App() {
         </a>
         <h1>高精度OCR识别</h1>
         <p>
-          {isMobile ? '上传图片、PDF即刻识别文字内容' : (
+          {isMobile ? '上传图片、PDF即刻识别文字内容' : isTauri() ? (
+            '全局快捷键 Ctrl+Shift+O 快速识别剪贴板图片，也支持拖拽、粘贴、上传'
+          ) : (
             '智能识别多国语言及手写体、表格、结构化抽取、数学公式，上传或拖拽图片、pdf 即刻识别文字内容，默认使用 Gemini 原生流式接口'
           )}
         </p>
@@ -466,7 +468,9 @@ function App() {
                 {images.length > 0 ? '重新上传' : '上传文件'}
               </label>
               <p className="supported-types">
-                支持的格式：PNG、JPG、PDF
+                {isTauri()
+                  ? '支持的格式：PNG、JPG、PDF | 快捷键：Ctrl+Shift+O'
+                  : '支持的格式：PNG、JPG、PDF'}
               </p>
               <input
                 id="file-input"
