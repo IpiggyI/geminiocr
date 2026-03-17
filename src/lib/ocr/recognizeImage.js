@@ -1,15 +1,6 @@
 import { OCR_PROMPT, appendTranslateInstruction } from './prompts';
 import { preprocessText } from './preprocessText';
-
-/**
- * 读取 File 为 base64 DataURL
- */
-const readFileAsBase64 = (file) =>
-  new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onloadend = () => resolve(reader.result);
-    reader.readAsDataURL(file);
-  });
+import { readFileAsDataUrl } from '../files/readFileAsDataUrl';
 
 /**
  * 识别图片中的文字
@@ -19,7 +10,7 @@ const readFileAsBase64 = (file) =>
 export const recognizeImage = async ({ file, translateLang, streamClient, onTextChunk }) => {
   if (!file || !file.type.startsWith('image/')) return '';
 
-  const dataUrl = await readFileAsBase64(file);
+  const dataUrl = await readFileAsDataUrl(file);
   const imageData = dataUrl.split(',')[1];
 
   let prompt = OCR_PROMPT;

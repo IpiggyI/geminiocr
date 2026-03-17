@@ -9,11 +9,12 @@ import 'bytemd/dist/index.css';
 import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import './App.css';
-import { pdfjs } from 'react-pdf';
 import { DEFAULT_GEMINI_API_URL, DEFAULT_GEMINI_MODEL, createRuntimeConfigResolver, buildGeminiEndpoint } from './lib/ocr/runtimeConfig';
 import { streamGeminiContent } from './lib/ocr/streamGeminiContent';
 import { recognizeImage } from './lib/ocr/recognizeImage';
 import { correctText } from './lib/ocr/correctText';
+import { dataUrlToFile } from './lib/files/dataUrlToFile';
+import { pdfToImageDataUrls } from './lib/pdf/pdfToImageDataUrls';
 
 // 配置 ByteMD 插件
 const plugins = [
@@ -208,46 +209,10 @@ function App() {
     }
   };
 
-  // 修改PDF文件处理函数
+  // PDF 文件处理：转图片 → 批量 OCR
   const handlePdfFile = async (file, startIndex) => {
     try {
-      // 加载 PDF.js worker
-      pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-      
-      const fileReader = new FileReader();
-      const pdfData = await new Promise((resolve) => {
-        fileReader.onload = () => resolve(fileReader.result);
-        fileReader.readAsArrayBuffer(file);
-      });
-
-      const pdf = await pdfjs.getDocument({ data: pdfData }).promise;
-      const totalPages = pdf.numPages;
-      const pdfImages = [];
-
-      // 第一步：先将所有PDF页面转换为图片
-      for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
-        try {
-          console.log('正在转换第', pageNum, '页为图片');
-          const page = await pdf.getPage(pageNum);
-          const viewport = page.getViewport({ scale: 2.0 });
-          
-          const canvas = document.createElement('canvas');
-          const context = canvas.getContext('2d');
-          canvas.height = viewport.height;
-          canvas.width = viewport.width;
-
-          await page.render({
-            canvasContext: context,
-            viewport: viewport
-          }).promise;
-
-          const imageData = canvas.toDataURL('image/jpeg', 1.0);
-          pdfImages.push(imageData);
-        } catch (pageError) {
-          console.error(`处理第 ${pageNum} 页时出错:`, pageError);
-          continue; // 继续处理下一页
-        }
-      }
+      const pdfImages = await pdfToImageDataUrls(file);
 
       // 更新图片预览
       setImages(prev => {
@@ -263,18 +228,17 @@ function App() {
         return newResults;
       });
 
-      // 使用 Promise.all 并行处理所有页面，但限制并发数
-      const batchSize = 6; // 每批处理的页面数
-      const results = [];
-      
+      // 批量识别，每批 6 页
+      const batchSize = 6;
+      const allResults = [];
+
       for (let i = 0; i < pdfImages.length; i += batchSize) {
         try {
           const batch = pdfImages.slice(i, i + batchSize);
-          const batchPromises = batch.map(async (imageData, batchIndex) => {
+          const batchPromises = batch.map(async (imgDataUrl, batchIndex) => {
             const pageIndex = i + batchIndex;
             try {
-              const imageBlob = await fetch(imageData).then(res => res.blob());
-              const imageFile = new File([imageBlob], `page_${pageIndex + 1}.jpg`, { type: 'image/jpeg' });
+              const imageFile = await dataUrlToFile(imgDataUrl, `page_${pageIndex + 1}.jpg`, 'image/jpeg');
               return handleImageFile(imageFile, startIndex + pageIndex);
             } catch (error) {
               console.error(`处理PDF第 ${pageIndex + 1} 页图片时出错:`, error);
@@ -282,17 +246,16 @@ function App() {
             }
           });
 
-          // 等待当前批次完成
           const batchResults = await Promise.allSettled(batchPromises);
-          results.push(...batchResults.map(result => 
-            result.status === 'fulfilled' ? result.value : `处理失败: ${result.reason}`
+          allResults.push(...batchResults.map(r =>
+            r.status === 'fulfilled' ? r.value : `处理失败: ${r.reason}`
           ));
         } catch (batchError) {
           console.error('处理PDF批次时出错:', batchError);
         }
       }
 
-      return results.filter(Boolean).join('\n\n---\n\n');
+      return allResults.filter(Boolean).join('\n\n---\n\n');
     } catch (error) {
       console.error('PDF处理错误:', error);
       throw new Error(`PDF处理失败: ${error.message}`);
