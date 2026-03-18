@@ -51,15 +51,15 @@ function App() {
     apiUrlConfig, setApiUrlConfig,
     apiKeyConfig, setApiKeyConfig,
     modelConfig, setModelConfig,
-    callGeminiStream,
+    envConfig,
     handleFile,
-    handleImageFile,
-    handlePdfFile,
     uploadFiles,
     correctCurrentText: handleCorrectText,
     handlePrevImage,
     handleNextImage,
   } = ocr;
+  const envGeminiApiUrl = envConfig.apiUrl;
+  const envGeminiModel = envConfig.model;
 
   // UI-only state
   const [isDragging, setIsDragging] = useState(false);

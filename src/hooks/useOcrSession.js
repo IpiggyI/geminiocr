@@ -31,12 +31,14 @@ export const useOcrSession = () => {
   const [apiKeyConfig, setApiKeyConfig] = useState('');
   const [modelConfig, setModelConfig] = useState('');
 
+  const envConfig = {
+    apiUrl: process.env.REACT_APP_GEMINI_API_URL || DEFAULT_GEMINI_API_URL,
+    apiKey: process.env.REACT_APP_GEMINI_API_KEY || '',
+    model: process.env.REACT_APP_GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
+  };
+
   const resolveConfig = createRuntimeConfigResolver({
-    envConfig: {
-      apiUrl: process.env.REACT_APP_GEMINI_API_URL || DEFAULT_GEMINI_API_URL,
-      apiKey: process.env.REACT_APP_GEMINI_API_KEY || '',
-      model: process.env.REACT_APP_GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
-    },
+    envConfig,
   });
 
   // ─── 流式请求客户端 ───
@@ -265,6 +267,7 @@ export const useOcrSession = () => {
     apiUrlConfig, setApiUrlConfig,
     apiKeyConfig, setApiKeyConfig,
     modelConfig, setModelConfig,
+    envConfig,
 
     // 动作
     callGeminiStream,
