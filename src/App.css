@@ -811,6 +811,16 @@ main.has-content {
   background: #fff;
 }
 
+.config-field-note {
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: #6e6e73;
+}
+
+.config-field-note--error {
+  color: #c62828;
+}
+
 /* Step 6: 环境默认值 — 信息卡片 */
 .api-config-hint {
   margin: 0.85rem 0 0;

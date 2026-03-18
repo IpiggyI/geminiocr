@@ -10,9 +10,16 @@ import 'katex/dist/katex.min.css';
 import 'highlight.js/styles/github.css';
 import './App.css';
 import { useOcrSession } from './hooks/useOcrSession';
-import { isTauri } from './desktop/tauriBridge';
+import { isTauri, showAndFocusWindow } from './desktop/tauriBridge';
 import { initDesktopShortcut } from './desktop/shortcutBootstrap';
 import { clipboardImageToFile } from './desktop/clipboardImageToFile';
+import { initDesktopWindowBehavior } from './desktop/windowBootstrap';
+import { shouldHandleGlobalPasteEvent } from './desktop/pasteGuards';
+import {
+  DEFAULT_DESKTOP_SHORTCUT,
+  loadDesktopShortcut,
+  saveDesktopShortcut,
+} from './desktop/desktopPreferences';
 
 // 配置 ByteMD 插件
 const plugins = [
@@ -60,34 +67,80 @@ function App() {
   } = ocr;
   const envGeminiApiUrl = envConfig.apiUrl;
   const envGeminiModel = envConfig.model;
+  const desktopMode = isTauri();
 
   // UI-only state
   const [isDragging, setIsDragging] = useState(false);
   const [isDraggingGlobal, setIsDraggingGlobal] = useState(false);
   const resultRef = useRef(null);
   const dropZoneRef = useRef(null);
+  const processClipboardImageRef = useRef(ocr.processClipboardImage);
+  const desktopShortcutHandlerRef = useRef(async () => {});
+  const desktopShortcutCleanupRef = useRef(async () => {});
+  const desktopWindowCleanupRef = useRef(async () => {});
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [desktopShortcutConfig, setDesktopShortcutConfig] = useState(() => loadDesktopShortcut());
+  const [activeDesktopShortcut, setActiveDesktopShortcut] = useState(() => loadDesktopShortcut());
+  const [desktopShortcutError, setDesktopShortcutError] = useState('');
+
+  processClipboardImageRef.current = ocr.processClipboardImage;
+  desktopShortcutHandlerRef.current = async () => {
+    const result = await clipboardImageToFile();
+    await showAndFocusWindow();
+
+    if (result.status === 'success') {
+      await processClipboardImageRef.current(result.file);
+      return;
+    }
+
+    alert(result.message);
+  };
 
   // 桌面端：全局快捷键 → 剪贴板图片 → 自动 OCR
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!desktopMode) return;
 
-    let cleanup;
-    initDesktopShortcut(async () => {
-      const file = await clipboardImageToFile();
-      if (file) {
-        ocr.processClipboardImage(file);
-      } else {
-        // 剪贴板无图片时提示
-        alert('剪贴板中没有图片，请先截图或复制图片');
+    let disposed = false;
+
+    const bootstrapDesktop = async () => {
+      desktopWindowCleanupRef.current = await initDesktopWindowBehavior();
+      const result = await initDesktopShortcut({
+        shortcut: loadDesktopShortcut(),
+        onTriggered: () => desktopShortcutHandlerRef.current(),
+      });
+
+      if (disposed) {
+        await desktopWindowCleanupRef.current();
+        await result.cleanup();
+        return;
       }
-    }).then((unlisten) => { cleanup = unlisten; });
 
-    return () => { if (cleanup) cleanup(); };
+      desktopShortcutCleanupRef.current = result.cleanup;
+
+      if (result.ok) {
+        const persistedShortcut = saveDesktopShortcut(result.activeShortcut);
+        setActiveDesktopShortcut(persistedShortcut);
+        setDesktopShortcutConfig(persistedShortcut);
+        setDesktopShortcutError('');
+        return;
+      }
+
+      setActiveDesktopShortcut(result.activeShortcut);
+      setDesktopShortcutConfig(result.activeShortcut);
+      setDesktopShortcutError(result.message);
+    };
+
+    void bootstrapDesktop();
+
+    return () => {
+      disposed = true;
+      void desktopShortcutCleanupRef.current();
+      void desktopWindowCleanupRef.current();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -104,14 +157,16 @@ function App() {
   // 修改粘贴事件处理函数
   useEffect(() => {
     const handlePaste = async (e) => {
-      e.preventDefault();
-      const items = Array.from(e.clipboardData.items);
+      if (!shouldHandleGlobalPasteEvent(e)) return;
+
+      const items = Array.from(e.clipboardData?.items || []);
       
       for (const item of items) {
         // 处理图片
         if (item.type.startsWith('image/')) {
           const file = item.getAsFile();
           if (file) {
+            e.preventDefault();
             setIsLoading(true);
             try {
               const imageUrl = URL.createObjectURL(file);
@@ -392,6 +447,36 @@ function App() {
   };
 
   const handleCloseConfigModal = () => {
+    setDesktopShortcutConfig(activeDesktopShortcut);
+    setDesktopShortcutError('');
+    setShowConfigModal(false);
+  };
+
+  const openConfigModal = () => {
+    setDesktopShortcutConfig(activeDesktopShortcut);
+    setDesktopShortcutError('');
+    setShowConfigModal(true);
+  };
+
+  const handleSaveConfigModal = async () => {
+    if (desktopMode) {
+      const result = await initDesktopShortcut({
+        shortcut: desktopShortcutConfig,
+        onTriggered: () => desktopShortcutHandlerRef.current(),
+      });
+
+      if (!result.ok) {
+        setDesktopShortcutError(result.message);
+        return;
+      }
+
+      desktopShortcutCleanupRef.current = result.cleanup;
+      const persistedShortcut = saveDesktopShortcut(result.activeShortcut);
+      setActiveDesktopShortcut(persistedShortcut);
+      setDesktopShortcutConfig(persistedShortcut);
+      setDesktopShortcutError('');
+    }
+
     setShowConfigModal(false);
   };
 
@@ -424,7 +509,7 @@ function App() {
           type="button"
           className="settings-link"
           aria-label="打开 API 配置"
-          onClick={() => setShowConfigModal(true)}
+          onClick={openConfigModal}
           style={{ display: isMobile ? 'none' : 'flex' }}
         >
           <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -445,8 +530,8 @@ function App() {
         </a>
         <h1>高精度OCR识别</h1>
         <p>
-          {isMobile ? '上传图片、PDF即刻识别文字内容' : isTauri() ? (
-            '全局快捷键 Ctrl+Shift+O 快速识别剪贴板图片，也支持拖拽、粘贴、上传'
+          {isMobile ? '上传图片、PDF即刻识别文字内容' : desktopMode ? (
+            `全局快捷键 ${activeDesktopShortcut} 快速识别剪贴板图片，也支持拖拽、粘贴、上传`
           ) : (
             '智能识别多国语言及手写体、表格、结构化抽取、数学公式，上传或拖拽图片、pdf 即刻识别文字内容，默认使用 Gemini 原生流式接口'
           )}
@@ -468,8 +553,8 @@ function App() {
                 {images.length > 0 ? '重新上传' : '上传文件'}
               </label>
               <p className="supported-types">
-                {isTauri()
-                  ? '支持的格式：PNG、JPG、PDF | 快捷键：Ctrl+Shift+O'
+                {desktopMode
+                  ? `支持的格式：PNG、JPG、PDF | 快捷键：${activeDesktopShortcut}`
                   : '支持的格式：PNG、JPG、PDF'}
               </p>
               <input
@@ -606,7 +691,7 @@ function App() {
               </svg>
               Gemini API 配置
             </h2>
-            <p className="config-modal-subtitle">页面填写优先生效；留空时自动回落到环境变量。</p>
+            <p className="config-modal-subtitle">桌面端和网页端共用同一套配置回落规则。页面填写优先生效，留空时自动回落到环境变量。</p>
 
             {/* Step 5: 卡片式字段 + 状态 Badge */}
             <div className="api-config-grid">
@@ -670,6 +755,31 @@ function App() {
                   className="api-config-input"
                 />
               </label>
+
+              {desktopMode && (
+                <label className={`config-field${desktopShortcutConfig !== DEFAULT_DESKTOP_SHORTCUT ? ' config-field--custom' : ''}`}>
+                  <div className="config-field-header">
+                    <div className="config-field-header-left">
+                      <svg className="config-field-icon" viewBox="0 0 16 16" fill="none"><path d="M3 5.25h10M3 8h10M3 10.75h10M5 3v10M8 3v10M11 3v10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                      <span className="config-field-label">桌面快捷键</span>
+                    </div>
+                    <span className={`config-field-badge ${desktopShortcutConfig !== DEFAULT_DESKTOP_SHORTCUT ? 'config-field-badge--custom' : 'config-field-badge--env'}`}>
+                      {desktopShortcutConfig !== DEFAULT_DESKTOP_SHORTCUT ? '自定义' : '默认'}
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    value={desktopShortcutConfig}
+                    onChange={(e) => setDesktopShortcutConfig(e.target.value)}
+                    placeholder={DEFAULT_DESKTOP_SHORTCUT}
+                    className="api-config-input"
+                  />
+                  <span className="config-field-note">留空会回到默认快捷键 {DEFAULT_DESKTOP_SHORTCUT}</span>
+                  {desktopShortcutError && (
+                    <span className="config-field-note config-field-note--error">{desktopShortcutError}</span>
+                  )}
+                </label>
+              )}
             </div>
 
             {/* 翻译设置 */}
@@ -733,6 +843,8 @@ function App() {
                   setModelConfig('');
                   setTranslateEnabled(false);
                   setTranslateLang('中文');
+                  setDesktopShortcutConfig(DEFAULT_DESKTOP_SHORTCUT);
+                  setDesktopShortcutError('');
                 }}
               >
                 清空并回落环境变量
@@ -740,7 +852,7 @@ function App() {
               <button
                 type="button"
                 className="config-save-button"
-                onClick={handleCloseConfigModal}
+                onClick={handleSaveConfigModal}
               >
                 完成
               </button>
