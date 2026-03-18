@@ -89,4 +89,19 @@ describe('windowBootstrap', () => {
     expect(showAndFocusWindow).toHaveBeenCalled();
     await cleanup();
   });
+
+  test('does not register close interception when tray init fails', async () => {
+    const onCloseRequested = jest.fn().mockResolvedValue(jest.fn());
+    getCurrentWindow.mockReturnValue({
+      hide: jest.fn(),
+      destroy: jest.fn(),
+      onCloseRequested,
+    });
+    defaultWindowIcon.mockResolvedValue(null);
+    Menu.new.mockResolvedValue({ close: jest.fn() });
+    TrayIcon.new.mockRejectedValue(new Error('tray init failed'));
+
+    await expect(initDesktopWindowBehavior()).rejects.toThrow('tray init failed');
+    expect(onCloseRequested).not.toHaveBeenCalled();
+  });
 });

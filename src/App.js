@@ -107,31 +107,51 @@ function App() {
     let disposed = false;
 
     const bootstrapDesktop = async () => {
-      desktopWindowCleanupRef.current = await initDesktopWindowBehavior();
-      const result = await initDesktopShortcut({
-        shortcut: loadDesktopShortcut(),
-        onTriggered: () => desktopShortcutHandlerRef.current(),
-      });
+      const [windowResult, shortcutResult] = await Promise.allSettled([
+        initDesktopWindowBehavior(),
+        initDesktopShortcut({
+          shortcut: loadDesktopShortcut(),
+          onTriggered: () => desktopShortcutHandlerRef.current(),
+        }),
+      ]);
 
       if (disposed) {
-        await desktopWindowCleanupRef.current();
-        await result.cleanup();
+        if (windowResult.status === 'fulfilled') {
+          await windowResult.value();
+        }
+        if (shortcutResult.status === 'fulfilled') {
+          await shortcutResult.value.cleanup();
+        }
         return;
       }
 
-      desktopShortcutCleanupRef.current = result.cleanup;
+      if (windowResult.status === 'fulfilled') {
+        desktopWindowCleanupRef.current = windowResult.value;
+      } else {
+        console.error('初始化桌面窗口行为失败:', windowResult.reason);
+      }
 
-      if (result.ok) {
-        const persistedShortcut = saveDesktopShortcut(result.activeShortcut);
-        setActiveDesktopShortcut(persistedShortcut);
-        setDesktopShortcutConfig(persistedShortcut);
-        setDesktopShortcutError('');
+      if (shortcutResult.status === 'fulfilled') {
+        const result = shortcutResult.value;
+        desktopShortcutCleanupRef.current = result.cleanup;
+
+        if (result.ok) {
+          const persistedShortcut = saveDesktopShortcut(result.activeShortcut);
+          setActiveDesktopShortcut(persistedShortcut);
+          setDesktopShortcutConfig(persistedShortcut);
+          setDesktopShortcutError('');
+          return;
+        }
+
+        setActiveDesktopShortcut(result.activeShortcut);
+        setDesktopShortcutConfig(result.activeShortcut);
+        setDesktopShortcutError(result.message);
         return;
       }
 
-      setActiveDesktopShortcut(result.activeShortcut);
-      setDesktopShortcutConfig(result.activeShortcut);
-      setDesktopShortcutError(result.message);
+      const errorMessage = `快捷键初始化失败，请检查格式或更换组合键 (${shortcutResult.reason?.message || 'unknown error'})`;
+      console.error('初始化桌面快捷键失败:', shortcutResult.reason);
+      setDesktopShortcutError(errorMessage);
     };
 
     void bootstrapDesktop();
@@ -459,25 +479,37 @@ function App() {
   };
 
   const handleSaveConfigModal = async () => {
+    let shortcutErrorMessage = '';
+
     if (desktopMode) {
-      const result = await initDesktopShortcut({
-        shortcut: desktopShortcutConfig,
-        onTriggered: () => desktopShortcutHandlerRef.current(),
-      });
+      try {
+        const result = await initDesktopShortcut({
+          shortcut: desktopShortcutConfig,
+          onTriggered: () => desktopShortcutHandlerRef.current(),
+        });
 
-      if (!result.ok) {
-        setDesktopShortcutError(result.message);
-        return;
+        if (result.ok) {
+          desktopShortcutCleanupRef.current = result.cleanup;
+          const persistedShortcut = saveDesktopShortcut(result.activeShortcut);
+          setActiveDesktopShortcut(persistedShortcut);
+          setDesktopShortcutConfig(persistedShortcut);
+          setDesktopShortcutError('');
+        } else {
+          shortcutErrorMessage = result.message;
+          setDesktopShortcutError(result.message);
+        }
+      } catch (error) {
+        shortcutErrorMessage = `快捷键注册失败，请检查格式或更换组合键 (${error.message})`;
+        console.error('保存桌面快捷键失败:', error);
+        setDesktopShortcutError(shortcutErrorMessage);
       }
-
-      desktopShortcutCleanupRef.current = result.cleanup;
-      const persistedShortcut = saveDesktopShortcut(result.activeShortcut);
-      setActiveDesktopShortcut(persistedShortcut);
-      setDesktopShortcutConfig(persistedShortcut);
-      setDesktopShortcutError('');
     }
 
     setShowConfigModal(false);
+
+    if (shortcutErrorMessage) {
+      alert(shortcutErrorMessage);
+    }
   };
 
   // 在 App 组件中添加复制函数

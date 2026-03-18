@@ -31,3 +31,23 @@ test('navigation bounds are respected', () => {
   act(() => { result.current.handleNextImage(); });
   expect(result.current.currentIndex).toBe(0);
 });
+
+test('persists api config to localStorage across remounts', () => {
+  window.localStorage.clear();
+
+  const { result, unmount } = renderHook(() => useOcrSession({}));
+
+  act(() => {
+    result.current.setApiKeyConfig('persisted-key');
+    result.current.setApiUrlConfig('https://example.com');
+    result.current.setModelConfig('gemini-2.5-pro');
+  });
+
+  unmount();
+
+  const { result: nextResult } = renderHook(() => useOcrSession({}));
+
+  expect(nextResult.current.apiKeyConfig).toBe('persisted-key');
+  expect(nextResult.current.apiUrlConfig).toBe('https://example.com');
+  expect(nextResult.current.modelConfig).toBe('gemini-2.5-pro');
+});

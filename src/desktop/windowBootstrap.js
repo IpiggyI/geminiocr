@@ -41,38 +41,58 @@ export const initDesktopWindowBehavior = async () => {
     import('@tauri-apps/api/window'),
   ]);
   const window = getCurrentWindow();
-  const unlistenClose = await window.onCloseRequested(async (event) => {
-    event.preventDefault();
-    await window.hide();
-  });
+  try {
+    if (!trayInstance) {
+      trayMenu = await createTrayMenu(window);
+      const icon = await defaultWindowIcon().catch(() => null);
 
-  if (!trayInstance) {
-    trayMenu = await createTrayMenu(window);
-    const icon = await defaultWindowIcon().catch(() => null);
+      trayInstance = await TrayIcon.new({
+        id: TRAY_ID,
+        icon: icon || undefined,
+        tooltip: 'GeminiOCR',
+        menu: trayMenu,
+        showMenuOnLeftClick: false,
+        action: (event) => {
+          if (event.type === 'Click' && event.button === 'Left' && event.buttonState === 'Up') {
+            void showAndFocusWindow();
+          }
+        },
+      });
+    }
 
-    trayInstance = await TrayIcon.new({
-      id: TRAY_ID,
-      icon: icon || undefined,
-      tooltip: 'GeminiOCR',
-      menu: trayMenu,
-      showMenuOnLeftClick: false,
-      action: (event) => {
-        if (event.type === 'Click' && event.button === 'Left' && event.buttonState === 'Up') {
-          void showAndFocusWindow();
-        }
-      },
+    const unlistenClose = await window.onCloseRequested(async (event) => {
+      event.preventDefault();
+      await window.hide();
     });
-  }
 
-  return async () => {
-    await unlistenClose();
+    return async () => {
+      await unlistenClose();
+      if (trayInstance) {
+        await trayInstance.close();
+        trayInstance = null;
+      }
+      if (trayMenu) {
+        await trayMenu.close();
+        trayMenu = null;
+      }
+    };
+  } catch (error) {
     if (trayInstance) {
-      await trayInstance.close();
+      try {
+        await trayInstance.close();
+      } catch (_) {
+        // ignore cleanup errors during bootstrap rollback
+      }
       trayInstance = null;
     }
     if (trayMenu) {
-      await trayMenu.close();
+      try {
+        await trayMenu.close();
+      } catch (_) {
+        // ignore cleanup errors during bootstrap rollback
+      }
       trayMenu = null;
     }
-  };
+    throw error;
+  }
 };

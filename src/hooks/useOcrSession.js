@@ -6,6 +6,26 @@ import { correctText } from '../lib/ocr/correctText';
 import { dataUrlToFile } from '../lib/files/dataUrlToFile';
 import { pdfToImageDataUrls } from '../lib/pdf/pdfToImageDataUrls';
 
+const API_CONFIG_STORAGE_KEYS = {
+  apiUrl: 'geminiocr-api-url-config',
+  apiKey: 'geminiocr-api-key-config',
+  model: 'geminiocr-model-config',
+};
+
+const readStoredValue = (key) => {
+  if (typeof window === 'undefined') return '';
+  return window.localStorage.getItem(key) || '';
+};
+
+const writeStoredValue = (key, value) => {
+  if (typeof window === 'undefined') return;
+  if (value) {
+    window.localStorage.setItem(key, value);
+  } else {
+    window.localStorage.removeItem(key);
+  }
+};
+
 /**
  * 统一管理 OCR 会话状态与动作
  * Web 端和 Desktop 端共用
@@ -27,9 +47,13 @@ export const useOcrSession = () => {
   useEffect(() => { translateLangRef.current = translateLang; }, [translateLang]);
 
   // ─── API 配置 ───
-  const [apiUrlConfig, setApiUrlConfig] = useState('');
-  const [apiKeyConfig, setApiKeyConfig] = useState('');
-  const [modelConfig, setModelConfig] = useState('');
+  const [apiUrlConfig, setApiUrlConfig] = useState(() => readStoredValue(API_CONFIG_STORAGE_KEYS.apiUrl));
+  const [apiKeyConfig, setApiKeyConfig] = useState(() => readStoredValue(API_CONFIG_STORAGE_KEYS.apiKey));
+  const [modelConfig, setModelConfig] = useState(() => readStoredValue(API_CONFIG_STORAGE_KEYS.model));
+
+  useEffect(() => { writeStoredValue(API_CONFIG_STORAGE_KEYS.apiUrl, apiUrlConfig); }, [apiUrlConfig]);
+  useEffect(() => { writeStoredValue(API_CONFIG_STORAGE_KEYS.apiKey, apiKeyConfig); }, [apiKeyConfig]);
+  useEffect(() => { writeStoredValue(API_CONFIG_STORAGE_KEYS.model, modelConfig); }, [modelConfig]);
 
   const envConfig = {
     apiUrl: process.env.REACT_APP_GEMINI_API_URL || DEFAULT_GEMINI_API_URL,
