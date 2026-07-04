@@ -1,6 +1,6 @@
 [package]
 name = "geminiocr"
-version = "0.1.0"
+version = "0.1.5"
 description = "Desktop OCR powered by Gemini"
 authors = ["CiZaii"]
 license = ""
@@ -22,3 +22,7 @@ log = "0.4"
 tauri = { version = "2", features = [] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-clipboard-manager = "2"
+tauri-plugin-http = "2"
+
+[target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
+tauri-plugin-single-instance = "2"
