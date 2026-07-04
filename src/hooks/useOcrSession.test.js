@@ -6,6 +6,7 @@ test('exposes unified session actions', () => {
   expect(typeof result.current.uploadFiles).toBe('function');
   expect(typeof result.current.processClipboardImage).toBe('function');
   expect(typeof result.current.correctCurrentText).toBe('function');
+  expect(typeof result.current.cancelRecognition).toBe('function');
   expect(typeof result.current.handleFile).toBe('function');
   expect(typeof result.current.handlePrevImage).toBe('function');
   expect(typeof result.current.handleNextImage).toBe('function');
@@ -30,6 +31,16 @@ test('navigation bounds are respected', () => {
   // next on empty list does nothing
   act(() => { result.current.handleNextImage(); });
   expect(result.current.currentIndex).toBe(0);
+});
+
+test('cancelRecognition resets loading state', () => {
+  const { result } = renderHook(() => useOcrSession({}));
+
+  act(() => { result.current.setIsLoading(true); });
+  expect(result.current.isLoading).toBe(true);
+
+  act(() => { result.current.cancelRecognition(); });
+  expect(result.current.isLoading).toBe(false);
 });
 
 test('persists api config to localStorage across remounts', () => {

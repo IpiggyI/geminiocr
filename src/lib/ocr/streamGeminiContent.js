@@ -11,9 +11,9 @@ const extractGeminiChunkText = (payload) =>
 
 /**
  * 向 Gemini API 发送流式请求，逐 chunk 回调文本
- * @param {{ endpoint: string, prompt: string, imageData?: string, mimeType?: string, onTextChunk: (text: string) => void }} options
+ * @param {{ endpoint: string, prompt: string, imageData?: string, mimeType?: string, onTextChunk: (text: string) => void, signal?: AbortSignal }} options
  */
-export const streamGeminiContent = async ({ endpoint, prompt, imageData, mimeType, onTextChunk }) => {
+export const streamGeminiContent = async ({ endpoint, prompt, imageData, mimeType, onTextChunk, signal }) => {
   const parts = [{ text: prompt }];
 
   if (imageData && mimeType) {
@@ -32,6 +32,7 @@ export const streamGeminiContent = async ({ endpoint, prompt, imageData, mimeTyp
       contents: [{ role: 'user', parts }],
       generationConfig: GENERATION_CONFIG,
     }),
+    signal,
   });
 
   if (!response.ok) {

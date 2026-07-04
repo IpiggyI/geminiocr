@@ -73,4 +73,21 @@ describe('App desktop regressions', () => {
       expect(screen.queryByText('Gemini API 配置')).not.toBeInTheDocument();
     });
   });
+
+  test('keeps settings entry visible when desktop window is narrow', async () => {
+    const originalInnerWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 500 });
+
+    try {
+      render(<App />);
+
+      await waitFor(() => {
+        expect(initDesktopShortcut).toHaveBeenCalled();
+      });
+
+      expect(screen.getByLabelText('打开 API 配置')).toBeVisible();
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth });
+    }
+  });
 });

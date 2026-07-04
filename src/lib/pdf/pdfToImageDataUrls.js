@@ -7,8 +7,8 @@ import { pdfjs } from 'react-pdf';
  * @returns {Promise<string[]>} 每页对应一个 DataURL
  */
 export const pdfToImageDataUrls = async (file, { scale = 2.0 } = {}) => {
-  pdfjs.GlobalWorkerOptions.workerSrc =
-    `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+  // worker 由 scripts/copy-pdf-worker.js 在构建前拷贝到 public/，与依赖版本保持一致
+  pdfjs.GlobalWorkerOptions.workerSrc = `${process.env.PUBLIC_URL || ''}/pdf.worker.min.js`;
 
   const fileReader = new FileReader();
   const pdfData = await new Promise((resolve) => {

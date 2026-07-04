@@ -65,11 +65,28 @@ export const useOcrSession = () => {
     envConfig,
   });
 
+  // ─── 取消控制 ───
+  const abortRef = useRef(null);
+  if (!abortRef.current) {
+    abortRef.current = new AbortController();
+  }
+
+  /** 取消所有进行中的识别/纠错请求，后续请求使用新的控制器 */
+  const cancelRecognition = useCallback(() => {
+    abortRef.current.abort();
+    abortRef.current = new AbortController();
+    setIsLoading(false);
+    setIsCorrectingText(false);
+  }, []);
+
   // ─── 流式请求客户端 ───
   const callGeminiStream = useCallback(async ({ prompt, imageData, mimeType, onTextChunk }) => {
     const { apiUrl, apiKey, model } = resolveConfig({ apiUrlConfig, apiKeyConfig, modelConfig });
     const endpoint = buildGeminiEndpoint(apiUrl, model, apiKey);
-    return streamGeminiContent({ endpoint, prompt, imageData, mimeType, onTextChunk });
+    return streamGeminiContent({
+      endpoint, prompt, imageData, mimeType, onTextChunk,
+      signal: abortRef.current.signal,
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiUrlConfig, apiKeyConfig, modelConfig]);
 
@@ -101,6 +118,14 @@ export const useOcrSession = () => {
       });
       return fullText;
     } catch (error) {
+      if (error.name === 'AbortError') {
+        setResults(prev => {
+          const newResults = [...prev];
+          newResults[index] = '已取消';
+          return newResults;
+        });
+        return '已取消';
+      }
       console.error('Error details:', error);
       const errorMessage = `识别出错,请重试 (${error.message})`;
       setResults(prev => {
@@ -130,8 +155,10 @@ export const useOcrSession = () => {
 
       const batchSize = 6;
       const allResults = [];
+      const signal = abortRef.current.signal;
 
       for (let i = 0; i < pdfImages.length; i += batchSize) {
+        if (signal.aborted) break;
         try {
           const batch = pdfImages.slice(i, i + batchSize);
           const batchPromises = batch.map(async (imgDataUrl, batchIndex) => {
@@ -211,7 +238,9 @@ export const useOcrSession = () => {
       setResults(prev => [...prev, ...new Array(validFiles.length).fill('')]);
       setCurrentIndex(startIndex);
 
+      const signal = abortRef.current.signal;
       for (let i = 0; i < validFiles.length; i++) {
+        if (signal.aborted) break;
         await handleFile(validFiles[i], startIndex + i);
       }
     } catch (error) {
@@ -295,6 +324,7 @@ export const useOcrSession = () => {
 
     // 动作
     callGeminiStream,
+    cancelRecognition,
     handleFile,
     handleImageFile,
     handlePdfFile,
