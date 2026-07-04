@@ -1,0 +1,19 @@
+name: Release Windows
+
+# 快路径：推 v* tag 自动只出 Windows 包，建/追加 Draft Release。
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  windows:
+    permissions:
+      contents: write
+    uses: ./.github/workflows/_build.yml
+    secrets: inherit
+    with:
+      platform: windows-latest
+      args: ''
+      rust-targets: ''
+      tag: ${{ github.ref_name }}

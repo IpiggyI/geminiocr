@@ -1,0 +1,24 @@
+name: Release Linux (manual · experimental)
+
+# 实验性：Linux 打包从未验证。首跑可能因 apt 依赖缺失或 AppImage FUSE 报错，
+# 需按运行日志调整 _build.yml 的 "Install Linux system dependencies" 步骤。
+# 手动补跑：填已存在的 tag，按 tag 追加进同一 Draft Release。
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v0.1.6) — must already exist'
+        required: true
+        type: string
+
+jobs:
+  linux:
+    permissions:
+      contents: write
+    uses: ./.github/workflows/_build.yml
+    secrets: inherit
+    with:
+      platform: ubuntu-latest
+      args: ''
+      rust-targets: ''
+      tag: ${{ inputs.tag }}

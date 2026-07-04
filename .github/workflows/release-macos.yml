@@ -1,0 +1,30 @@
+name: Release macOS (manual)
+
+# 手动补跑：填已存在的 tag，出 aarch64 + x86_64 两个包，按 tag 追加进同一 Draft Release。
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to build (e.g. v0.1.6) — must already exist'
+        required: true
+        type: string
+
+jobs:
+  macos:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - args: --target aarch64-apple-darwin
+            rust-targets: aarch64-apple-darwin
+          - args: --target x86_64-apple-darwin
+            rust-targets: x86_64-apple-darwin
+    uses: ./.github/workflows/_build.yml
+    secrets: inherit
+    with:
+      platform: macos-latest
+      args: ${{ matrix.args }}
+      rust-targets: ${{ matrix.rust-targets }}
+      tag: ${{ inputs.tag }}
