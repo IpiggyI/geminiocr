@@ -1,6 +1,6 @@
 {
   "name": "ocr-app",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "private": true,
   "dependencies": {
     "@bytemd/plugin-breaks": "^1.21.0",
