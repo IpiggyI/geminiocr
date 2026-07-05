@@ -4,6 +4,10 @@
   "framework": "create-react-app",
   "rewrites": [
     {
+      "source": "/api/gemini/(.*)",
+      "destination": "/api/gemini?__path=$1"
+    },
+    {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
     }

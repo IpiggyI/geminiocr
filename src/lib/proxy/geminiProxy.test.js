@@ -23,26 +23,30 @@ describe('evaluateProxyAccess', () => {
 });
 
 describe('buildUpstreamUrl', () => {
-  test('strips /api/gemini prefix and joins upstream origin', () => {
+  test('joins tail path onto upstream origin and preserves query', () => {
     const url = buildUpstreamUrl({
-      requestUrl: '/api/gemini/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse',
+      tailPath: 'v1beta/models/gemini-2.5-flash:streamGenerateContent',
+      query: { __path: 'v1beta/models/gemini-2.5-flash:streamGenerateContent', alt: 'sse' },
       upstreamBase: DEFAULT_GEMINI_ORIGIN,
     });
     expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse');
   });
 
-  test('drops client-supplied key param, keeps other query', () => {
+  test('drops __path and client-supplied key, keeps other query', () => {
     const url = buildUpstreamUrl({
-      requestUrl: '/api/gemini/v1beta/models/x:streamGenerateContent?alt=sse&key=leaked',
+      tailPath: 'v1beta/models/x:streamGenerateContent',
+      query: { __path: 'v1beta/models/x:streamGenerateContent', alt: 'sse', key: 'leaked' },
       upstreamBase: DEFAULT_GEMINI_ORIGIN,
     });
     expect(url).not.toContain('key=leaked');
+    expect(url).not.toContain('__path');
     expect(url).toContain('alt=sse');
   });
 
   test('honors custom upstream base and normalizes trailing slash', () => {
     const url = buildUpstreamUrl({
-      requestUrl: '/api/gemini/v1beta/models/x:streamGenerateContent?alt=sse',
+      tailPath: 'v1beta/models/x:streamGenerateContent',
+      query: { alt: 'sse' },
       upstreamBase: 'https://proxy.example.com/',
     });
     expect(url).toBe('https://proxy.example.com/v1beta/models/x:streamGenerateContent?alt=sse');
