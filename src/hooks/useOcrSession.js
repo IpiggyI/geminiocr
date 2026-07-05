@@ -244,7 +244,11 @@ export const useOcrSession = () => {
 
       const previews = await Promise.all(validFiles.map(async file => {
         if (file.type.startsWith('image/')) return URL.createObjectURL(file);
-        if (file.type === 'application/pdf') return '/pdf-icon.png';
+        if (file.type === 'application/pdf') {
+          return 'data:image/svg+xml,' + encodeURIComponent(
+            '<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64"><path fill="#e2e8f0" d="M14 4h26l14 14v42a4 4 0 0 1-4 4H14a4 4 0 0 1-4-4V8a4 4 0 0 1 4-4z"/><path fill="#cbd5e1" d="M40 4l14 14H44a4 4 0 0 1-4-4V4z"/><rect x="16" y="38" width="32" height="16" rx="2" fill="#ef4444"/><text x="32" y="50" font-family="Arial,sans-serif" font-size="9" font-weight="bold" fill="#fff" text-anchor="middle">PDF</text></svg>'
+          );
+        }
         return '';
       }));
 

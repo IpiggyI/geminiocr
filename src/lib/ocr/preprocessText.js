@@ -18,8 +18,10 @@ export const preprocessText = (text) => {
   // 标准化数学公式分隔符（Gemini 输出的双反斜杠形式 \\( \\) \\[ \\]）
   text = text.replace(/\\\\\(/g, '$');
   text = text.replace(/\\\\\)/g, '$');
-  text = text.replace(/\\\\\[/g, '$$');
-  text = text.replace(/\\\\\]/g, '$$');
+  // 用函数替换：替换串里的字面量 '$$' 会被 String.replace 转义成单个 '$'，
+  // 函数返回值不参与该转义，块级定界符才能正确产出 '$$'
+  text = text.replace(/\\\\\[/g, () => '$$');
+  text = text.replace(/\\\\\]/g, () => '$$');
 
   // 移除代码围栏及语言标识
   text = text.replace(/```[\s\S]*?```/g, (match) => {

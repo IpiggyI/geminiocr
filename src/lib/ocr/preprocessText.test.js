@@ -12,12 +12,16 @@ test('normalizes inline latex delimiters \\\\( \\\\) to $', () => {
   expect(output).toContain('$x^2$');
 });
 
-test('normalizes block latex delimiters \\\\[ \\\\] to $', () => {
-  // 注意：String.replace 中 '$$' 是特殊转义，替换结果为单个 $
-  // 这是原始 App.js 的行为，保持一致
+test('normalizes block latex delimiters \\\\[ \\\\] to $$', () => {
   const input = '\\\\[y=x+1\\\\]';
   const output = preprocessText(input);
-  expect(output).toContain('$y=x+1$');
+  expect(output).toContain('$$y=x+1$$');
+});
+
+test('preserves block latex as $$ delimiters (S5 regression)', () => {
+  const input = '\\\\[E=mc^2\\\\]';
+  const output = preprocessText(input);
+  expect(output).toContain('$$E=mc^2$$');
 });
 
 test('returns empty string for falsy input', () => {

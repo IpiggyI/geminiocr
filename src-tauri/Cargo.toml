@@ -1,6 +1,6 @@
 [package]
 name = "geminiocr"
-version = "0.1.6"
+version = "0.1.7"
 description = "Desktop OCR powered by Gemini"
 authors = ["CiZaii"]
 license = ""
@@ -19,10 +19,11 @@ tauri-build = { version = "2", features = [] }
 serde_json = "1"
 serde = { version = "1", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2", features = [] }
+tauri = { version = "2", features = ["tray-icon"] }
 tauri-plugin-global-shortcut = "2"
 tauri-plugin-clipboard-manager = "2"
 tauri-plugin-http = "2"
 
 [target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
 tauri-plugin-single-instance = "2"
+tauri-plugin-window-state = "2"

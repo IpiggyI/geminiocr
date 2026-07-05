@@ -1,7 +1,3 @@
-jest.mock('./desktop/windowBootstrap', () => ({
-  initDesktopWindowBehavior: jest.fn(),
-}));
-
 jest.mock('./desktop/shortcutBootstrap', () => ({
   initDesktopShortcut: jest.fn(),
 }));
@@ -12,7 +8,6 @@ jest.mock('./desktop/clipboardImageToFile', () => ({
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import App from './App';
-import { initDesktopWindowBehavior } from './desktop/windowBootstrap';
 import { initDesktopShortcut } from './desktop/shortcutBootstrap';
 
 describe('App desktop regressions', () => {
@@ -23,7 +18,6 @@ describe('App desktop regressions', () => {
     window.__TAURI_INTERNALS__ = {};
     window.alert = jest.fn();
     consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
-    initDesktopWindowBehavior.mockResolvedValue(async () => {});
     initDesktopShortcut.mockResolvedValue({
       ok: true,
       activeShortcut: 'CommandOrControl+Shift+O',
@@ -35,16 +29,6 @@ describe('App desktop regressions', () => {
   afterEach(() => {
     delete window.__TAURI_INTERNALS__;
     consoleErrorSpy.mockRestore();
-  });
-
-  test('still initializes shortcut when window behavior setup fails', async () => {
-    initDesktopWindowBehavior.mockRejectedValueOnce(new Error('tray init failed'));
-
-    render(<App />);
-
-    await waitFor(() => {
-      expect(initDesktopShortcut).toHaveBeenCalled();
-    });
   });
 
   test('saving api config still closes modal when shortcut update fails', async () => {

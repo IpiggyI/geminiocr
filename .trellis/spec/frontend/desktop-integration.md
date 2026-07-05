@@ -12,6 +12,23 @@
 
 ---
 
+## 窗口生命周期归 Rust 侧（不走 JS 桥接）
+
+托盘、关闭隐藏、窗口唤起等**窗口生命周期**在 `src-tauri/src/lib.rs` 实现，**不放 JS 桥接层**。
+
+**根因**：`capabilities/default.json` 只授 `core:default`，其 window 能力仅只读 getter；JS 侧 `show`/`hide`/`setFocus`/`unminimize`/`destroy` 及 `TrayIcon`/`Menu` 会被 ACL 拒绝，`default_window_icon` 不在授权内还会导致托盘图标为空。补权限并不划算——留下 StrictMode 双跑、bootstrap 时序、静默失败三个隐患。
+
+**约定**：
+- 窗口显示/隐藏/聚焦、托盘图标+菜单、`CloseRequested` 拦截、单实例唤起，统一在 Rust `setup` 钩子与 `on_window_event` 里做——编译期资源、无运行时授权依赖、webview 加载前即生效。
+- JS 需要唤起窗口时，调用 Rust 暴露的 `#[tauri::command] show_main_window`（`tauriBridge.showAndFocusWindow` → `invoke('show_main_window')`），而非自己操作 window。命令名两侧必须完全一致。
+- 自定义 command 的 `invoke` **无需额外 capabilities 授权**；不要为此新增 window 权限。
+- Rust 托盘需要 `tauri` crate 的 **`tray-icon` feature（非默认，必须显式开启）**，否则 `TrayIconBuilder` 编译不过。
+- 托盘「退出」走 `app.exit(0)`，绕开 `CloseRequested` 的 hide 拦截。
+
+对应地，`src/desktop/` **不再保留** windowBootstrap 这类 JS 托盘/窗口模块。
+
+---
+
 ## 环境检测：`isTauri()` 守卫
 
 所有桥接函数以 `isTauri()`（`src/desktop/tauriBridge.js`）判定，web 环境**返回安全默认值而非报错**：
@@ -22,14 +39,14 @@ export const isTauri = () =>
 
 export const showAndFocusWindow = async () => {
   if (!isTauri()) return;                 // web 环境静默跳过
-  const { getCurrentWindow } = await import('@tauri-apps/api/window');
-  // ...
+  const { invoke } = await import('@tauri-apps/api/core');
+  await invoke('show_main_window');       // 窗口显示逻辑在 Rust 侧
 };
 ```
 
 降级返回值要贴合调用方期望：
 - 无副作用操作 → `return;`（`showAndFocusWindow`）；
-- 需要 cleanup 的 → 返回**空 cleanup 函数** `return async () => {};`（`initDesktopWindowBehavior`）；
+- 需要 cleanup 的 → 返回**空 cleanup 函数** `return async () => {};`；
 - 带结果语义的 → 返回结构化对象 `{ ok: true, activeShortcut }` / `{ status: 'unsupported', ... }`。
 
 ---
@@ -45,7 +62,7 @@ const registerShortcut = async (shortcut, onTriggered) => {
 };
 ```
 
-原因：静态 import 会把 Tauri 运行时打进 web bundle，浏览器加载即报错。动态 import 保证 web 端根本不加载这些模块。需要并行加载多个时用 `Promise.all([...])`（见 `windowBootstrap.js`）。
+原因：静态 import 会把 Tauri 运行时打进 web bundle，浏览器加载即报错。动态 import 保证 web 端根本不加载这些模块。需要并行加载多个时用 `Promise.all([...])`。
 
 ---
 
@@ -68,11 +85,10 @@ const registerShortcut = async (shortcut, onTriggered) => {
 
 | 模块 | 职责 | 关键点 |
 |------|------|--------|
-| `tauriBridge.js` | 环境检测、窗口显示/聚焦 | `isTauri()`、`showAndFocusWindow` |
+| `tauriBridge.js` | 环境检测、经 Rust command 唤起窗口 | `isTauri()`；`showAndFocusWindow` → `invoke('show_main_window')` |
 | `desktopPreferences.js` | 快捷键归一化 + localStorage 持久化 | 等于默认值即删 key；`typeof window` 守卫 |
 | `shortcutBootstrap.js` | 全局快捷键注册/注销 | 模块级 `registeredShortcut` 单例；先注销旧的再注册；返回 `cleanup` |
 | `shortcutRecorder.js` | 键盘事件 → 快捷键字符串 | 供 ConfigModal 录制 |
-| `windowBootstrap.js` | 托盘图标 + 关闭拦截 | `onCloseRequested` → `preventDefault` + `hide`；返回 cleanup 关闭托盘 |
 | `clipboardImageToFile.js` | 读剪贴板图片为 File | Tauri 优先、浏览器 `navigator.clipboard` 回退 |
 | `pasteGuards.js` | 判断粘贴事件是否该全局处理 | 编辑态元素内不拦截 |
 
@@ -89,9 +105,9 @@ const registerShortcut = async (shortcut, onTriggered) => {
 桌面初始化集中在 `App.js` 一个 `useEffect(..., [])` 里：
 
 - `if (!desktopMode) return;` 先短路 web 端。
-- 用 `Promise.allSettled([initDesktopWindowBehavior(), initDesktopShortcut(...)])` 并行启动，单项失败不拖垮另一项。
+- 用 `Promise.allSettled([initDesktopShortcut(...)])` 启动快捷键（窗口生命周期已归 Rust 侧，不在此编排）；`allSettled` 保留以便未来并入更多桌面初始化项时单项失败互不拖垮。
 - `disposed` 标志防竞态：effect 已清理但异步初始化才返回时，立即回滚（调用其 cleanup）。
-- cleanup 函数存进 ref（`desktopShortcutCleanupRef` / `desktopWindowCleanupRef`），在 effect 卸载时 `void cleanup()`。
+- cleanup 函数存进 ref（`desktopShortcutCleanupRef`），在 effect 卸载时 `void cleanup()`。
 - 触发回调读最新 handler 用 ref（`desktopShortcutHandlerRef.current`），避免一次性注册闭包陈旧（见 [hook-guidelines.md](./hook-guidelines.md)）。
 
 派生 UI 差异用 `desktopMode` / `isCompact` 分支：桌面端展示快捷键提示文案，且**桌面窗口不进入移动端降级布局**（`const isCompact = isMobile && !desktopMode;`）。
@@ -102,7 +118,7 @@ const registerShortcut = async (shortcut, onTriggered) => {
 
 - 测桌面路径时，在 `beforeEach` 里设 `window.__TAURI_INTERNALS__ = {}` 驱动真实的 `isTauri()` 返回 true，并 `jest.mock('@tauri-apps/...')` 掉各原生模块；web 路径则不设该全局。
 - 测试断言桥接函数在非 Tauri 环境返回约定的降级值（如 `{ ok: true, activeShortcut }`、空 cleanup）。
-- 参考 `windowBootstrap.test.js`、`clipboardImageToFile.test.js`、`shortcutBootstrap.test.js`、`App.desktop.test.js`。
+- 参考 `clipboardImageToFile.test.js`、`shortcutBootstrap.test.js`、`App.desktop.test.js`。
 
 ---
 
