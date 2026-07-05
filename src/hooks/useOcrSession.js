@@ -3,6 +3,7 @@ import { DEFAULT_GEMINI_API_URL, DEFAULT_GEMINI_MODEL, createRuntimeConfigResolv
 import { streamGeminiContent } from '../lib/ocr/streamGeminiContent';
 import { recognizeImage } from '../lib/ocr/recognizeImage';
 import { correctText } from '../lib/ocr/correctText';
+import { translateText } from '../lib/ocr/translateText';
 import { dataUrlToFile } from '../lib/files/dataUrlToFile';
 import { pdfToImageDataUrls } from '../lib/pdf/pdfToImageDataUrls';
 import { isTauri } from '../desktop/tauriBridge';
@@ -40,6 +41,14 @@ export const useOcrSession = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
   const [isCorrectingText, setIsCorrectingText] = useState(false);
+
+  // ─── 结果衍生状态（按 index 与 results 对齐）───
+  const [translations, setTranslations] = useState([]);   // 译文
+  const [errors, setErrors] = useState([]);               // 识别错误（不写进 results）
+  const [translateErrors, setTranslateErrors] = useState([]); // 翻译错误
+  const [files, setFiles] = useState([]);                 // 原始 File 引用（供重试识别）
+  const [translating, setTranslating] = useState([]);     // 翻译进行中
+  const translateResultRef = useRef(null);                // 打破 handleImageFile → translateResult 依赖环
 
   // ─── 翻译配置 ───
   const [translateEnabled, setTranslateEnabled] = useState(false);
@@ -108,11 +117,12 @@ export const useOcrSession = () => {
   /** 处理单张图片识别 */
   const handleImageFile = useCallback(async (file, index) => {
     if (!file || !file.type.startsWith('image/')) return;
+    // 新一轮识别：清掉该 index 上一次的错误态
+    setErrors(prev => { const next = [...prev]; next[index] = ''; return next; });
     try {
       let liveText = '';
       const fullText = await recognizeImage({
         file,
-        translateLang: translateEnabledRef.current ? translateLangRef.current : '',
         streamClient: callGeminiStream,
         onTextChunk: (chunk) => {
           liveText += chunk;
@@ -129,6 +139,11 @@ export const useOcrSession = () => {
         newResults[index] = fullText;
         return newResults;
       });
+
+      // 识别恒为纯 OCR；开启自动翻译时，识别完成后独立触发翻译（不阻塞识别生命周期）
+      if (translateEnabledRef.current) {
+        translateResultRef.current?.(index, fullText);
+      }
       return fullText;
     } catch (error) {
       if (error.name === 'AbortError') {
@@ -140,12 +155,10 @@ export const useOcrSession = () => {
         return '已取消';
       }
       console.error('Error details:', error);
-      const errorMessage = `识别出错,请重试 (${error.message})`;
-      setResults(prev => {
-        const newResults = [...prev];
-        newResults[index] = errorMessage;
-        return newResults;
-      });
+      const errorMessage = `识别失败：${error.message}`;
+      // 错误进错误通道，不写入 results（避免错误文本污染识别结果）
+      setErrors(prev => { const next = [...prev]; next[index] = errorMessage; return next; });
+      toast(errorMessage, { type: 'error' });
       throw error;
     }
   }, [callGeminiStream]);
@@ -203,6 +216,10 @@ export const useOcrSession = () => {
 
   /** 统一文件处理入口 */
   const handleFile = useCallback(async (file, index) => {
+    // 记录原始文件引用，供后续「重试识别」重跑同一文件
+    if (index >= 0) {
+      setFiles(prev => { const next = [...prev]; next[index] = file; return next; });
+    }
     try {
       let content = '';
       if (file.type === 'application/pdf') {
@@ -222,11 +239,12 @@ export const useOcrSession = () => {
       }
     } catch (error) {
       console.error('处理文件时出错:', error);
+      // 错误进错误通道；若 handleImageFile 已记录则不覆盖（避免双写、保留更具体信息）
       if (index >= 0) {
-        setResults(prev => {
-          const newResults = [...prev];
-          newResults[index] = `处理出错: ${error.message}`;
-          return newResults;
+        setErrors(prev => {
+          const next = [...prev];
+          if (!next[index]) next[index] = `处理失败：${error.message}`;
+          return next;
         });
       }
     }
@@ -316,6 +334,34 @@ export const useOcrSession = () => {
     }
   }, [results, currentIndex, isCorrectingText, callGeminiStream]);
 
+  /** 翻译某条识别结果（两段式翻译的第二段；失败置错误态、不污染 results） */
+  const translateResult = useCallback(async (index, sourceText) => {
+    const source = sourceText != null ? sourceText : results[index];
+    if (!source || !source.trim()) return;
+
+    setTranslateErrors(prev => { const next = [...prev]; next[index] = ''; return next; });
+    setTranslating(prev => { const next = [...prev]; next[index] = true; return next; });
+    try {
+      let liveText = '';
+      await translateText({
+        text: source,
+        lang: translateLangRef.current,
+        streamClient: callGeminiStream,
+        onTextChunk: (chunk) => {
+          liveText += chunk;
+          setTranslations(prev => { const next = [...prev]; next[index] = liveText; return next; });
+        },
+      });
+    } catch (error) {
+      if (error.name === 'AbortError') return;
+      console.error('翻译出错:', error);
+      setTranslateErrors(prev => { const next = [...prev]; next[index] = `翻译失败：${error.message}`; return next; });
+    } finally {
+      setTranslating(prev => { const next = [...prev]; next[index] = false; return next; });
+    }
+  }, [results, callGeminiStream]);
+  translateResultRef.current = translateResult;
+
   // ─── 导航 ───
   const handlePrevImage = useCallback(() => {
     if (currentIndex > 0) setCurrentIndex(prev => prev - 1);
@@ -332,6 +378,11 @@ export const useOcrSession = () => {
     currentIndex, setCurrentIndex,
     isLoading, setIsLoading,
     isCorrectingText,
+    translations, setTranslations,
+    errors, setErrors,
+    translateErrors, setTranslateErrors,
+    files, setFiles,
+    translating, setTranslating,
     translateEnabled, setTranslateEnabled,
     translateLang, setTranslateLang,
     apiUrlConfig, setApiUrlConfig,
@@ -349,6 +400,7 @@ export const useOcrSession = () => {
     uploadFiles,
     processClipboardImage,
     correctCurrentText,
+    translateResult,
     handlePrevImage,
     handleNextImage,
   };
