@@ -4,7 +4,7 @@ import { evaluateProxyAccess, buildUpstreamUrl, DEFAULT_GEMINI_ORIGIN } from '..
  * Gemini 流式透明代理端点（Vercel Node 固定路由）。
  * vercel.json 把 /api/gemini/<尾路径> rewrite 到 /api/gemini?__path=<尾路径>，
  * 本函数据 __path + 其余 query 重建上游 URL（避开 [...path] catch-all 多段不匹配的坑）。
- * 校验访问口令 → 注入服务端 Key（x-goog-api-key 头）→ 逐 chunk 透传上游 SSE 流。
+ * 校验访问口令 → 注入服务端 Key（?key= 查询参数，兼容自定义镜像）→ 逐 chunk 透传上游 SSE 流。
  */
 export default async function handler(req, res) {
   const denial = evaluateProxyAccess({
@@ -21,13 +21,13 @@ export default async function handler(req, res) {
       tailPath: req.query.__path,
       query: req.query,
       upstreamBase: process.env.GEMINI_API_URL || DEFAULT_GEMINI_ORIGIN,
+      apiKey: process.env.GEMINI_API_KEY,
     });
 
     const upstream = await fetch(upstreamUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-goog-api-key': process.env.GEMINI_API_KEY,
       },
       body: JSON.stringify(req.body),
     });

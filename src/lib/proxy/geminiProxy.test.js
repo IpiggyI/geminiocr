@@ -32,23 +32,26 @@ describe('buildUpstreamUrl', () => {
     expect(url).toBe('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse');
   });
 
-  test('drops __path and client-supplied key, keeps other query', () => {
+  test('injects server apiKey as ?key= and overrides client-supplied key', () => {
     const url = buildUpstreamUrl({
       tailPath: 'v1beta/models/x:streamGenerateContent',
       query: { __path: 'v1beta/models/x:streamGenerateContent', alt: 'sse', key: 'leaked' },
       upstreamBase: DEFAULT_GEMINI_ORIGIN,
+      apiKey: 'server-key',
     });
-    expect(url).not.toContain('key=leaked');
+    expect(url).toContain('key=server-key');
+    expect(url).not.toContain('leaked');
     expect(url).not.toContain('__path');
     expect(url).toContain('alt=sse');
   });
 
-  test('honors custom upstream base and normalizes trailing slash', () => {
+  test('honors custom upstream base (mirror) and normalizes trailing slash', () => {
     const url = buildUpstreamUrl({
       tailPath: 'v1beta/models/x:streamGenerateContent',
       query: { alt: 'sse' },
-      upstreamBase: 'https://proxy.example.com/',
+      upstreamBase: 'https://mirror.example.com/',
+      apiKey: 'k',
     });
-    expect(url).toBe('https://proxy.example.com/v1beta/models/x:streamGenerateContent?alt=sse');
+    expect(url).toBe('https://mirror.example.com/v1beta/models/x:streamGenerateContent?alt=sse&key=k');
   });
 });

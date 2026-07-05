@@ -26,11 +26,12 @@ export const evaluateProxyAccess = ({ method, accessToken, expectedToken }) => {
 
 /**
  * 由 vercel rewrite 传入的 __path（Gemini 尾路径）+ 其余 query 拼出上游 URL。
- * 剔除 __path 与 key（Key 只走服务端注入的 x-goog-api-key 头，不入 query）。
- * @param {{ tailPath?: string, query?: Record<string, string|string[]>, upstreamBase: string }} input
+ * 剔除客户端可能带入的 key，改注入服务端 apiKey 为 ?key=（与直连一致，兼容
+ * 只认 query key 的自定义镜像；官方 API 亦接受该形式）。
+ * @param {{ tailPath?: string, query?: Record<string, string|string[]>, upstreamBase: string, apiKey?: string }} input
  * @returns {string}
  */
-export const buildUpstreamUrl = ({ tailPath, query = {}, upstreamBase }) => {
+export const buildUpstreamUrl = ({ tailPath, query = {}, upstreamBase, apiKey }) => {
   const base = upstreamBase.replace(/\/+$/, '');
   const path = String(tailPath || '').replace(/^\/+/, '');
   const url = new URL(`${base}/${path}`);
@@ -41,6 +42,9 @@ export const buildUpstreamUrl = ({ tailPath, query = {}, upstreamBase }) => {
     } else if (value !== undefined) {
       url.searchParams.append(key, value);
     }
+  }
+  if (apiKey) {
+    url.searchParams.set('key', apiKey);
   }
   return url.toString();
 };
