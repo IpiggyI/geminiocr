@@ -1,13 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Viewer } from '@bytemd/react';
-import mathPlugin from '@bytemd/plugin-math';
-import gfmPlugin from '@bytemd/plugin-gfm';
-import highlightPlugin from '@bytemd/plugin-highlight';
-import breaksPlugin from '@bytemd/plugin-breaks';
-import frontmatterPlugin from '@bytemd/plugin-frontmatter';
-import 'bytemd/dist/index.css';
-import 'katex/dist/katex.min.css';
-import 'highlight.js/styles/github.css';
 import './App.css';
 import { useOcrSession } from './hooks/useOcrSession';
 import { isTauri, showAndFocusWindow } from './desktop/tauriBridge';
@@ -17,25 +8,11 @@ import { shouldHandleGlobalPasteEvent } from './desktop/pasteGuards';
 import { fetchImageBlob } from './lib/files/fetchImageBlob';
 import { ToastHost, toast } from './components/Toast';
 import { ConfigModal } from './components/ConfigModal';
+import { UploadDropzone } from './components/UploadDropzone';
+import { ImagePane } from './components/ImagePane';
+import { ResultPane } from './components/ResultPane';
+import { SettingsIcon } from './components/icons';
 import { loadDesktopShortcut, saveDesktopShortcut } from './desktop/desktopPreferences';
-
-// 配置 ByteMD 插件
-const plugins = [
-  mathPlugin({
-    katexOptions: {
-      throwOnError: false,
-      output: 'html',
-      strict: false,
-      macros: {
-        '\\f': '#1f(#2)',
-      },
-    }
-  }),
-  gfmPlugin(),
-  highlightPlugin(),
-  breaksPlugin(),
-  frontmatterPlugin()
-];
 
 function App() {
   const ocr = useOcrSession();
@@ -57,7 +34,6 @@ function App() {
   // UI-only state
   const [isDragging, setIsDragging] = useState(false);
   const [isDraggingGlobal, setIsDraggingGlobal] = useState(false);
-  const resultRef = useRef(null);
   const dropZoneRef = useRef(null);
   const processClipboardImageRef = useRef(ocr.processClipboardImage);
   const desktopShortcutHandlerRef = useRef(async () => {});
@@ -465,10 +441,7 @@ function App() {
           onClick={openConfigModal}
           style={{ display: isCompact ? 'none' : 'flex' }}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M10.325 4.317a1 1 0 0 1 1.35-.936l.664.286a1 1 0 0 0 .79 0l.664-.286a1 1 0 0 1 1.35.936l.081.72a1 1 0 0 0 .596.804l.663.287a1 1 0 0 1 .55 1.31l-.286.663a1 1 0 0 0 0 .79l.286.663a1 1 0 0 1-.55 1.31l-.663.287a1 1 0 0 0-.596.804l-.081.72a1 1 0 0 1-1.35.936l-.664-.286a1 1 0 0 0-.79 0l-.664.286a1 1 0 0 1-1.35-.936l-.081-.72a1 1 0 0 0-.596-.804l-.663-.287a1 1 0 0 1-.55-1.31l.286-.663a1 1 0 0 0 0-.79l-.286-.663a1 1 0 0 1 .55-1.31l.663-.287a1 1 0 0 0 .596-.804l.081-.72z" />
-            <circle cx="12" cy="12" r="3" />
-          </svg>
+          <SettingsIcon />
         </button>
         <h1>高精度OCR识别</h1>
         <p>
@@ -482,133 +455,47 @@ function App() {
 
       <main className={images.length > 0 ? 'has-content' : ''}>
         <div className={`upload-section ${images.length > 0 ? 'with-image' : ''}`}>
-          <div
-            ref={dropZoneRef}
-            className={`upload-zone ${isDragging ? 'dragging' : ''}`}
-            onDragEnter={!isCompact ? handleDragEnter : undefined}
-            onDragOver={!isCompact ? handleDragOver : undefined}
-            onDragLeave={!isCompact ? handleDragLeave : undefined}
-            onDrop={!isCompact ? handleDrop : undefined}
-          >
-            <div className="upload-container">
-              <label className="upload-button" htmlFor="file-input">
-                {images.length > 0 ? '重新上传' : '上传文件'}
-              </label>
-              <p className="supported-types">
-                {desktopMode
-                  ? `支持的格式：PNG、JPG、PDF | 快捷键：${activeDesktopShortcut}`
-                  : '支持的格式：PNG、JPG、PDF'}
-              </p>
-              <input
-                id="file-input"
-                type="file"
-                accept="image/*,application/pdf"
-                onChange={handleImageUpload}
-                multiple
-                hidden
-              />
-              {!isCompact && (
-                <button
-                  className="url-button"
-                  onClick={() => setShowUrlInput(!showUrlInput)}
-                >
-                  {showUrlInput ? '取消' : '使用链接'}
-                </button>
-              )}
-            </div>
-            
-            {showUrlInput && !isCompact && (
-              <form onSubmit={handleUrlSubmit} className="url-form">
-                <input
-                  type="url"
-                  value={imageUrl}
-                  onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="请输入图片链接"
-                  className="url-input"
-                />
-                <button type="submit" className="url-submit">
-                  确认
-                </button>
-              </form>
-            )}
-            
-            {!images.length > 0 && !showUrlInput && !isCompact && (
-              <p className="upload-hint">或将图片拖放到此处</p>
-            )}
-          </div>
-          
+          <UploadDropzone
+            dropZoneRef={dropZoneRef}
+            isDragging={isDragging}
+            isCompact={isCompact}
+            desktopMode={desktopMode}
+            activeDesktopShortcut={activeDesktopShortcut}
+            hasImages={images.length > 0}
+            onFileChange={handleImageUpload}
+            showUrlInput={showUrlInput}
+            onToggleUrlInput={() => setShowUrlInput(!showUrlInput)}
+            imageUrl={imageUrl}
+            onImageUrlChange={(e) => setImageUrl(e.target.value)}
+            onUrlSubmit={handleUrlSubmit}
+            onDragEnter={handleDragEnter}
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={handleDrop}
+          />
+
           {images.length > 0 && (
-            <div className="images-preview">
-              <div className="image-navigation">
-                <button 
-                  onClick={handlePrevImage} 
-                  disabled={currentIndex === 0}
-                  className="nav-button"
-                >
-                  ←
-                </button>
-                <span className="image-counter">
-                  {currentIndex + 1} / {images.length}
-                </span>
-                <button 
-                  onClick={handleNextImage}
-                  disabled={currentIndex === images.length - 1}
-                  className="nav-button"
-                >
-                  →
-                </button>
-              </div>
-              <div className={`image-preview ${isLoading ? 'loading' : ''}`}>
-                <img 
-                  src={images[currentIndex]} 
-                  alt="预览" 
-                  onClick={handleImageClick}
-                  style={{ cursor: 'pointer' }}
-                />
-                {isLoading && <div className="loading-overlay" />}
-              </div>
-            </div>
+            <ImagePane
+              images={images}
+              currentIndex={currentIndex}
+              isLoading={isLoading}
+              onPrev={handlePrevImage}
+              onNext={handleNextImage}
+              onImageClick={handleImageClick}
+            />
           )}
         </div>
 
         {(results.length > 0 || isLoading) && (
-          <div className="result-section">
-            <div className="result-container" ref={resultRef}>
-              {isLoading && (
-                <div className="loading">
-                  识别中...
-                  <button className="cancel-button" onClick={cancelRecognition}>
-                    取消
-                  </button>
-                </div>
-              )}
-              {results[currentIndex] && (
-                <div className="result-text">
-                  <div className="result-header">
-                    <span>第 {currentIndex + 1} 张图片的识别结果</span>
-                    <div className="result-actions">
-                      <button className="copy-button" onClick={handleCopyText}>
-                        复制内容
-                      </button>
-                      <button
-                        className="copy-button"
-                        onClick={handleCorrectText}
-                        disabled={isCorrectingText}
-                      >
-                        {isCorrectingText ? '纠错中...' : '一键纠错'}
-                      </button>
-                    </div>
-                  </div>
-                  <div className="markdown-body">
-                    <Viewer 
-                      value={results[currentIndex] || ''} 
-                      plugins={plugins}
-                    />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          <ResultPane
+            results={results}
+            currentIndex={currentIndex}
+            isLoading={isLoading}
+            isCorrectingText={isCorrectingText}
+            onCancel={cancelRecognition}
+            onCopy={handleCopyText}
+            onCorrect={handleCorrectText}
+          />
         )}
       </main>
 
