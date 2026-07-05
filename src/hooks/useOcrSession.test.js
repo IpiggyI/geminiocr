@@ -67,6 +67,36 @@ test('cancelRecognition resets loading state', () => {
   expect(result.current.isLoading).toBe(false);
 });
 
+test('clearSession revokes blob previews and resets all result state', () => {
+  const originalRevoke = URL.revokeObjectURL;
+  URL.revokeObjectURL = jest.fn();
+
+  const { result } = renderHook(() => useOcrSession({}));
+
+  act(() => {
+    result.current.setImages(['blob:demo-1', 'data:image/png;base64,xxx']);
+    result.current.setResults(['r0', 'r1']);
+    result.current.setTranslations(['t0']);
+    result.current.setErrors(['e0']);
+    result.current.setFiles([imageFile()]);
+    result.current.setCurrentIndex(1);
+  });
+
+  act(() => { result.current.clearSession(); });
+
+  // 仅撤销 blob: 预览，data: URL 不撤销
+  expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:demo-1');
+  expect(URL.revokeObjectURL).not.toHaveBeenCalledWith('data:image/png;base64,xxx');
+  expect(result.current.images).toEqual([]);
+  expect(result.current.results).toEqual([]);
+  expect(result.current.translations).toEqual([]);
+  expect(result.current.errors).toEqual([]);
+  expect(result.current.files).toEqual([]);
+  expect(result.current.currentIndex).toBe(0);
+
+  URL.revokeObjectURL = originalRevoke;
+});
+
 test('persists api config to localStorage across remounts', () => {
   window.localStorage.clear();
 

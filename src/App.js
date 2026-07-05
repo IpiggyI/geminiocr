@@ -3,7 +3,7 @@ import './App.css';
 import { useOcrSession } from './hooks/useOcrSession';
 import { isTauri, showAndFocusWindow } from './desktop/tauriBridge';
 import { initDesktopShortcut } from './desktop/shortcutBootstrap';
-import { clipboardImageToFile } from './desktop/clipboardImageToFile';
+import { clipboardImageToFile, readBrowserClipboardImage } from './desktop/clipboardImageToFile';
 import { shouldHandleGlobalPasteEvent } from './desktop/pasteGuards';
 import { fetchImageBlob } from './lib/files/fetchImageBlob';
 import { ToastHost, toast } from './components/Toast';
@@ -26,6 +26,7 @@ function App() {
     uploadFiles,
     cancelRecognition,
     correctCurrentText: handleCorrectText,
+    clearSession,
     handlePrevImage,
     handleNextImage,
   } = ocr;
@@ -179,6 +180,39 @@ function App() {
   // 文件上传处理 — 委托给 useOcrSession
   const handleImageUpload = async (e) => {
     await uploadFiles(Array.from(e.target.files));
+  };
+
+  // 「粘贴」按钮：主动读剪贴板图片（桌面走 Tauri，Web 走浏览器剪贴板 API）
+  const handlePasteButton = async () => {
+    if (desktopMode) {
+      const result = await clipboardImageToFile();
+      if (result.status === 'success') {
+        await ocr.processClipboardImage(result.file);
+      } else {
+        toast(result.message, { type: result.status === 'error' ? 'error' : 'info' });
+      }
+      return;
+    }
+
+    try {
+      const file = await readBrowserClipboardImage();
+      if (file) {
+        await ocr.processClipboardImage(file);
+      } else {
+        toast('剪贴板中没有图片，可截图后重试或直接按 Ctrl+V 粘贴', { type: 'info' });
+      }
+    } catch (error) {
+      console.error('读取剪贴板失败:', error);
+      toast('读取剪贴板失败，请改用 Ctrl+V 粘贴', { type: 'error' });
+    }
+  };
+
+  // 「清除」按钮：清空会话 + 复位上传区 UI
+  const handleClearAll = () => {
+    clearSession();
+    setShowUrlInput(false);
+    setImageUrl('');
+    setShowModal(false);
   };
 
   // 添加全局拖拽事件监听
@@ -463,6 +497,8 @@ function App() {
             activeDesktopShortcut={activeDesktopShortcut}
             hasImages={images.length > 0}
             onFileChange={handleImageUpload}
+            onPaste={handlePasteButton}
+            onClear={handleClearAll}
             showUrlInput={showUrlInput}
             onToggleUrlInput={() => setShowUrlInput(!showUrlInput)}
             imageUrl={imageUrl}

@@ -7,6 +7,27 @@ test('renders app heading', () => {
   expect(heading).toBeInTheDocument();
 });
 
+test('empty state renders four action buttons with clear disabled', () => {
+  render(<App />);
+
+  expect(screen.getByText('上传')).toBeInTheDocument();
+  expect(screen.getByText('粘贴')).toBeInTheDocument();
+  expect(screen.getByText('链接')).toBeInTheDocument();
+
+  // 空态无内容可清，「清除」禁用
+  expect(screen.getByText('清除').closest('button')).toBeDisabled();
+});
+
+test('link button toggles inline url input in empty state', () => {
+  render(<App />);
+
+  expect(screen.queryByPlaceholderText('请输入图片链接')).not.toBeInTheDocument();
+
+  fireEvent.click(screen.getByText('链接'));
+
+  expect(screen.getByPlaceholderText('请输入图片链接')).toBeInTheDocument();
+});
+
 test('opens api config modal and shows environment fallbacks', () => {
   render(<App />);
 

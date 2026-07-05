@@ -408,6 +408,150 @@ header p {
   width: 100%;
 }
 
+/* ── 步骤3：空态 dropzone 重排 ── */
+.upload-zone.is-empty {
+  border-radius: 20px;
+  padding: 2.5rem 2rem;
+  gap: 1.5rem;
+  background: rgba(255, 255, 255, 0.6);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+}
+
+.upload-zone.is-empty.dragging {
+  border-style: solid;
+  border-color: #0071e3;
+  background: rgba(0, 113, 227, 0.05);
+  transform: scale(1.01);
+  box-shadow: inset 0 0 30px rgba(0, 113, 227, 0.12), 0 0 24px rgba(98, 0, 255, 0.15);
+}
+
+.upload-zone.is-empty.dragging .dropzone-trigger,
+.upload-zone.is-empty.dragging .dropzone-actions {
+  opacity: 0;
+  visibility: hidden;
+}
+
+.upload-zone.is-empty.dragging::after {
+  content: '松开以上传';
+  color: #0071e3;
+  background: transparent;
+}
+
+.dropzone-trigger {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 1.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: transform 0.18s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dropzone-trigger:hover {
+  transform: translateY(-2px);
+}
+
+.dropzone-trigger:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.35);
+}
+
+.dropzone-icon svg {
+  width: 64px;
+  height: 64px;
+  display: block;
+}
+
+.dropzone-hint-main {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #1d1d1f;
+}
+
+.dropzone-hint-sub {
+  display: block;
+  margin-top: 0.35rem;
+  font-size: 0.8rem;
+  color: #86868b;
+}
+
+.dropzone-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 44px;
+  padding: 0 1.25rem;
+  border-radius: 99px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1.5px solid transparent;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+
+.btn-pill svg {
+  width: 18px;
+  height: 18px;
+}
+
+.btn-pill:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
+.btn-pill:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.3);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #0071e3, #6200ff);
+  color: #fff;
+  box-shadow: 0 5px 15px rgba(0, 113, 227, 0.2);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 8px 20px rgba(0, 113, 227, 0.3);
+}
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.6);
+  color: #0071e3;
+  border-color: rgba(0, 113, 227, 0.3);
+}
+
+.btn-ghost:hover:not(:disabled) {
+  background: rgba(0, 113, 227, 0.08);
+}
+
+.btn-pill:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropzone-trigger,
+  .btn-pill {
+    transition: none;
+  }
+
+  .dropzone-trigger:hover,
+  .btn-pill:hover:not(:disabled) {
+    transform: none;
+  }
+}
+
 .gradient-text {
   opacity: 1;
   color: #1d1d1f;

@@ -148,6 +148,8 @@ export const useOcrSession = () => {
     } catch (error) {
       if (error.name === 'AbortError') {
         setResults(prev => {
+          // 若数组已被 clearSession 清空/缩短，则不复活该条（避免留下幽灵结果）
+          if (index >= prev.length) return prev;
           const newResults = [...prev];
           newResults[index] = '已取消';
           return newResults;
@@ -362,6 +364,25 @@ export const useOcrSession = () => {
   }, [results, callGeminiStream]);
   translateResultRef.current = translateResult;
 
+  /** 清空整个会话：撤销 blob 预览 URL + 重置全部结果衍生状态 */
+  const clearSession = useCallback(() => {
+    // 撤销 createObjectURL 生成的 blob: 预览，避免内存泄漏（data: URL 无需撤销）
+    images.forEach((url) => {
+      if (typeof url === 'string' && url.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+    });
+    cancelRecognition(); // 中止进行中的识别/纠错请求，并复位 loading 态
+    setImages([]);
+    setResults([]);
+    setTranslations([]);
+    setErrors([]);
+    setTranslateErrors([]);
+    setFiles([]);
+    setTranslating([]);
+    setCurrentIndex(0);
+  }, [images, cancelRecognition]);
+
   // ─── 导航 ───
   const handlePrevImage = useCallback(() => {
     if (currentIndex > 0) setCurrentIndex(prev => prev - 1);
@@ -401,6 +422,7 @@ export const useOcrSession = () => {
     processClipboardImage,
     correctCurrentText,
     translateResult,
+    clearSession,
     handlePrevImage,
     handleNextImage,
   };

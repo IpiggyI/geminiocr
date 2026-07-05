@@ -37,7 +37,7 @@ const readTauriClipboardImage = async () => {
   return imageDataToFile(imageData);
 };
 
-const readBrowserClipboardImage = async () => {
+export const readBrowserClipboardImage = async () => {
   if (!navigator.clipboard?.read) return null;
 
   const items = await navigator.clipboard.read();
