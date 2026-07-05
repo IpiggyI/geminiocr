@@ -54,7 +54,7 @@ describe('createRuntimeConfigResolver', () => {
       accessTokenConfig: 'my-pass',
     })).toEqual({
       mode: 'proxy',
-      apiUrl: '/api/gemini/v1beta',
+      apiUrl: '/api/gemini',
       accessToken: 'my-pass',
       model: 'env-model',
     });
@@ -102,8 +102,8 @@ describe('buildGeminiEndpoint', () => {
   });
 
   test('omits key param in proxy mode (no api key)', () => {
-    const url = buildGeminiEndpoint('/api/gemini/v1beta', 'gemini-2.5-flash', '');
-    expect(url).toBe('/api/gemini/v1beta/models/gemini-2.5-flash:streamGenerateContent?alt=sse');
+    const url = buildGeminiEndpoint('/api/gemini', 'gemini-2.5-flash', '');
+    expect(url).toBe('/api/gemini/models/gemini-2.5-flash:streamGenerateContent?alt=sse');
     expect(url).not.toContain('key=');
   });
 });

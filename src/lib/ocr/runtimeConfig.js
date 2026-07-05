@@ -1,8 +1,10 @@
 export const DEFAULT_GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta';
 export const DEFAULT_GEMINI_MODEL = 'gemini-2.5-flash';
 
-/** Web 端无 Key 时走的服务端代理基址（口令保护，见 api/gemini/[...path].js） */
-export const PROXY_API_BASE = '/api/gemini/v1beta';
+/** Web 端无 Key 时走的服务端代理基址（口令保护，见 api/gemini.js）。
+ *  代理上游 = GEMINI_API_URL + /models/...，与直连的 apiUrl 同构，
+ *  故 GEMINI_API_URL 可直接照抄 REACT_APP_GEMINI_API_URL（含 /v1beta）。 */
+export const PROXY_API_BASE = '/api/gemini';
 
 export const GENERATION_CONFIG = {
   temperature: 0,

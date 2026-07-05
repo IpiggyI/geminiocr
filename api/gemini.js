@@ -1,4 +1,4 @@
-import { evaluateProxyAccess, buildUpstreamUrl, DEFAULT_GEMINI_ORIGIN } from '../src/lib/proxy/geminiProxy';
+import { evaluateProxyAccess, buildUpstreamUrl, DEFAULT_GEMINI_API_BASE } from '../src/lib/proxy/geminiProxy';
 
 /**
  * Gemini 流式透明代理端点（Vercel Node 固定路由）。
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
     const upstreamUrl = buildUpstreamUrl({
       tailPath: req.query.__path,
       query: req.query,
-      upstreamBase: process.env.GEMINI_API_URL || DEFAULT_GEMINI_ORIGIN,
+      upstreamBase: process.env.GEMINI_API_URL || DEFAULT_GEMINI_API_BASE,
       apiKey: process.env.GEMINI_API_KEY,
     });
 

@@ -3,8 +3,8 @@
  * 端点 handler 见 api/gemini.js。
  */
 
-/** 代理默认上游 origin（GEMINI_API_URL 未配时回落；__path 自带 /v1beta） */
-export const DEFAULT_GEMINI_ORIGIN = 'https://generativelanguage.googleapis.com';
+/** 代理默认上游基址（GEMINI_API_URL 未配时回落；与前端直连 apiUrl 同构，含 /v1beta） */
+export const DEFAULT_GEMINI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta';
 
 /**
  * 访问门校验：非 POST → 405；未配置口令 → 503；口令不匹配 → 401；通过 → null
