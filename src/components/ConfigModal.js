@@ -1,7 +1,6 @@
 import { DEFAULT_DESKTOP_SHORTCUT } from '../desktop/desktopPreferences';
 import { keyboardEventToShortcut } from '../desktop/shortcutRecorder';
-
-const TRANSLATE_LANGUAGES = ['中文', '英语', '日语', '韩语', '法语', '德语', '西班牙语', '俄语'];
+import { TRANSLATE_LANGUAGES } from '../lib/ocr/translateLanguages';
 
 /**
  * Gemini API / 翻译 / 桌面快捷键配置弹窗

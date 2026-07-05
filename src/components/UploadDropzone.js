@@ -1,10 +1,8 @@
-import { useRef } from 'react';
 import { CameraIcon, UploadIcon, PasteIcon, LinkIcon, ClearIcon } from './icons';
 
 /**
- * 上传区（dropzone）。
- * 空态：相机图标 + 提示文案 + 四按钮排（上传/粘贴/链接/清除），点击主体即触发文件选择。
- * 有图态沿用旧「重新上传」结构（左图右文重排属步骤4）。
+ * 空态上传区（dropzone）：相机图标 + 提示文案 + 四按钮排（上传/粘贴/链接/清除）。
+ * 点击主体或「上传」触发文件选择（picker 由 App 持有）。有图态改由 Toolbar 承接（步骤4）。
  */
 export function UploadDropzone({
   dropZoneRef,
@@ -12,10 +10,8 @@ export function UploadDropzone({
   isCompact,
   desktopMode,
   activeDesktopShortcut,
-  hasImages,
-  onFileChange,
+  onPickFile,
   onPaste,
-  onClear,
   showUrlInput,
   onToggleUrlInput,
   imageUrl,
@@ -26,8 +22,6 @@ export function UploadDropzone({
   onDragLeave,
   onDrop,
 }) {
-  const fileInputRef = useRef(null);
-  const triggerFilePicker = () => fileInputRef.current?.click();
   const subHint = desktopMode
     ? `支持 PNG · JPG · PDF · 快捷键 ${activeDesktopShortcut}`
     : '支持 PNG · JPG · PDF';
@@ -35,69 +29,39 @@ export function UploadDropzone({
   return (
     <div
       ref={dropZoneRef}
-      className={`upload-zone ${isDragging ? 'dragging' : ''} ${hasImages ? '' : 'is-empty'}`}
+      className={`upload-zone is-empty ${isDragging ? 'dragging' : ''}`}
       onDragEnter={!isCompact ? onDragEnter : undefined}
       onDragOver={!isCompact ? onDragOver : undefined}
       onDragLeave={!isCompact ? onDragLeave : undefined}
       onDrop={!isCompact ? onDrop : undefined}
     >
-      <input
-        id="file-input"
-        ref={fileInputRef}
-        type="file"
-        accept="image/*,application/pdf"
-        onChange={onFileChange}
-        multiple
-        hidden
-      />
+      <button type="button" className="dropzone-trigger" onClick={onPickFile}>
+        <span className="dropzone-icon">
+          <CameraIcon />
+        </span>
+        <span className="dropzone-hint-main">拖拽、点击 或 Ctrl+V 粘贴上传</span>
+        <span className="dropzone-hint-sub">{subHint}</span>
+      </button>
 
-      {hasImages ? (
-        <div className="upload-container">
-          <label className="upload-button" htmlFor="file-input">
-            重新上传
-          </label>
-          <p className="supported-types">{subHint}</p>
-          {!isCompact && (
-            <button className="url-button" onClick={onToggleUrlInput}>
-              {showUrlInput ? '取消' : '使用链接'}
-            </button>
-          )}
-        </div>
-      ) : (
-        <>
-          <button type="button" className="dropzone-trigger" onClick={triggerFilePicker}>
-            <span className="dropzone-icon">
-              <CameraIcon />
-            </span>
-            <span className="dropzone-hint-main">拖拽、点击 或 Ctrl+V 粘贴上传</span>
-            <span className="dropzone-hint-sub">{subHint}</span>
-          </button>
-
-          <div className="dropzone-actions">
-            <label className="btn-pill btn-primary" htmlFor="file-input">
-              <UploadIcon />
-              <span>上传</span>
-            </label>
-            <button type="button" className="btn-pill btn-ghost" onClick={onPaste}>
-              <PasteIcon />
-              <span>粘贴</span>
-            </button>
-            <button type="button" className="btn-pill btn-ghost" onClick={onToggleUrlInput}>
-              <LinkIcon />
-              <span>{showUrlInput ? '取消' : '链接'}</span>
-            </button>
-            <button
-              type="button"
-              className="btn-pill btn-ghost"
-              onClick={onClear}
-              disabled={!hasImages}
-            >
-              <ClearIcon />
-              <span>清除</span>
-            </button>
-          </div>
-        </>
-      )}
+      <div className="dropzone-actions">
+        <button type="button" className="btn-pill btn-primary" onClick={onPickFile}>
+          <UploadIcon />
+          <span>上传</span>
+        </button>
+        <button type="button" className="btn-pill btn-ghost" onClick={onPaste}>
+          <PasteIcon />
+          <span>粘贴</span>
+        </button>
+        <button type="button" className="btn-pill btn-ghost" onClick={onToggleUrlInput}>
+          <LinkIcon />
+          <span>{showUrlInput ? '取消' : '链接'}</span>
+        </button>
+        {/* 空态无内容可清，「清除」始终禁用（有图态由 Toolbar 提供可用的清除） */}
+        <button type="button" className="btn-pill btn-ghost" disabled>
+          <ClearIcon />
+          <span>清除</span>
+        </button>
+      </div>
 
       {showUrlInput && (
         <form onSubmit={onUrlSubmit} className="url-form">

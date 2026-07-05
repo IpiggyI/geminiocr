@@ -9,6 +9,8 @@ import { fetchImageBlob } from './lib/files/fetchImageBlob';
 import { ToastHost, toast } from './components/Toast';
 import { ConfigModal } from './components/ConfigModal';
 import { UploadDropzone } from './components/UploadDropzone';
+import { Toolbar } from './components/Toolbar';
+import { SplitPane } from './components/SplitPane';
 import { ImagePane } from './components/ImagePane';
 import { ResultPane } from './components/ResultPane';
 import { SettingsIcon } from './components/icons';
@@ -27,15 +29,15 @@ function App() {
     cancelRecognition,
     correctCurrentText: handleCorrectText,
     clearSession,
-    handlePrevImage,
-    handleNextImage,
   } = ocr;
   const desktopMode = isTauri();
+  const hasImages = images.length > 0;
 
   // UI-only state
   const [isDragging, setIsDragging] = useState(false);
   const [isDraggingGlobal, setIsDraggingGlobal] = useState(false);
   const dropZoneRef = useRef(null);
+  const fileInputRef = useRef(null);
   const processClipboardImageRef = useRef(ocr.processClipboardImage);
   const desktopShortcutHandlerRef = useRef(async () => {});
   const desktopShortcutCleanupRef = useRef(async () => {});
@@ -179,8 +181,12 @@ function App() {
 
   // 文件上传处理 — 委托给 useOcrSession
   const handleImageUpload = async (e) => {
-    await uploadFiles(Array.from(e.target.files));
+    const files = Array.from(e.target.files);
+    e.target.value = ''; // 先重置，允许连续选同一文件再次触发 change
+    await uploadFiles(files);
   };
+
+  const openFilePicker = () => fileInputRef.current?.click();
 
   // 「粘贴」按钮：主动读剪贴板图片（桌面走 Tauri，Web 走浏览器剪贴板 API）
   const handlePasteButton = async () => {
@@ -467,38 +473,48 @@ function App() {
   return (
     <div className="app">
       <ToastHost />
-      <header>
-        <button
-          type="button"
-          className="settings-link"
-          aria-label="打开 API 配置"
-          onClick={openConfigModal}
-          style={{ display: isCompact ? 'none' : 'flex' }}
-        >
-          <SettingsIcon />
-        </button>
-        <h1>高精度OCR识别</h1>
-        <p>
-          {isCompact ? '上传图片、PDF即刻识别文字内容' : desktopMode ? (
-            `全局快捷键 ${activeDesktopShortcut} 快速识别剪贴板图片，也支持拖拽、粘贴、上传`
-          ) : (
-            '智能识别多国语言及手写体、表格、结构化抽取、数学公式，上传或拖拽图片、pdf 即刻识别文字内容，默认使用 Gemini 原生流式接口'
-          )}
-        </p>
-      </header>
+      {!hasImages && (
+        <header>
+          <button
+            type="button"
+            className="settings-link"
+            aria-label="打开 API 配置"
+            onClick={openConfigModal}
+            style={{ display: isCompact ? 'none' : 'flex' }}
+          >
+            <SettingsIcon />
+          </button>
+          <h1>高精度OCR识别</h1>
+          <p>
+            {isCompact ? '上传图片、PDF即刻识别文字内容' : desktopMode ? (
+              `全局快捷键 ${activeDesktopShortcut} 快速识别剪贴板图片，也支持拖拽、粘贴、上传`
+            ) : (
+              '智能识别多国语言及手写体、表格、结构化抽取、数学公式，上传或拖拽图片、pdf 即刻识别文字内容，默认使用 Gemini 原生流式接口'
+            )}
+          </p>
+        </header>
+      )}
 
-      <main className={images.length > 0 ? 'has-content' : ''}>
-        <div className={`upload-section ${images.length > 0 ? 'with-image' : ''}`}>
+      <input
+        id="file-input"
+        ref={fileInputRef}
+        type="file"
+        accept="image/*,application/pdf"
+        onChange={handleImageUpload}
+        multiple
+        hidden
+      />
+
+      <main className={hasImages ? 'has-content' : ''}>
+        {!hasImages ? (
           <UploadDropzone
             dropZoneRef={dropZoneRef}
             isDragging={isDragging}
             isCompact={isCompact}
             desktopMode={desktopMode}
             activeDesktopShortcut={activeDesktopShortcut}
-            hasImages={images.length > 0}
-            onFileChange={handleImageUpload}
+            onPickFile={openFilePicker}
             onPaste={handlePasteButton}
-            onClear={handleClearAll}
             showUrlInput={showUrlInput}
             onToggleUrlInput={() => setShowUrlInput(!showUrlInput)}
             imageUrl={imageUrl}
@@ -509,29 +525,49 @@ function App() {
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
           />
-
-          {images.length > 0 && (
-            <ImagePane
-              images={images}
-              currentIndex={currentIndex}
-              isLoading={isLoading}
-              onPrev={handlePrevImage}
-              onNext={handleNextImage}
-              onImageClick={handleImageClick}
+        ) : (
+          <div
+            className={`workspace ${isDragging ? 'dragging' : ''}`}
+            ref={dropZoneRef}
+            onDragEnter={!isCompact ? handleDragEnter : undefined}
+            onDragOver={!isCompact ? handleDragOver : undefined}
+            onDragLeave={!isCompact ? handleDragLeave : undefined}
+            onDrop={!isCompact ? handleDrop : undefined}
+          >
+            <Toolbar
+              onPickFile={openFilePicker}
+              onPaste={handlePasteButton}
+              onToggleUrlInput={() => setShowUrlInput(!showUrlInput)}
+              onClear={handleClearAll}
+              showUrlInput={showUrlInput}
+              translateEnabled={ocr.translateEnabled}
+              onToggleTranslate={() => ocr.setTranslateEnabled(!ocr.translateEnabled)}
+              translateLang={ocr.translateLang}
+              onChangeLang={(e) => ocr.setTranslateLang(e.target.value)}
+              onOpenConfig={openConfigModal}
+              imageUrl={imageUrl}
+              onImageUrlChange={(e) => setImageUrl(e.target.value)}
+              onUrlSubmit={handleUrlSubmit}
             />
-          )}
-        </div>
-
-        {(results.length > 0 || isLoading) && (
-          <ResultPane
-            results={results}
-            currentIndex={currentIndex}
-            isLoading={isLoading}
-            isCorrectingText={isCorrectingText}
-            onCancel={cancelRecognition}
-            onCopy={handleCopyText}
-            onCorrect={handleCorrectText}
-          />
+            <SplitPane disabled={isCompact}>
+              <ImagePane
+                images={images}
+                currentIndex={currentIndex}
+                isLoading={isLoading}
+                onSelect={setCurrentIndex}
+                onImageClick={handleImageClick}
+              />
+              <ResultPane
+                results={results}
+                currentIndex={currentIndex}
+                isLoading={isLoading}
+                isCorrectingText={isCorrectingText}
+                onCancel={cancelRecognition}
+                onCopy={handleCopyText}
+                onCorrect={handleCorrectText}
+              />
+            </SplitPane>
+          </div>
         )}
       </main>
 

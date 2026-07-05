@@ -410,6 +410,8 @@ header p {
 
 /* ── 步骤3：空态 dropzone 重排 ── */
 .upload-zone.is-empty {
+  width: 100%;
+  max-width: 600px;
   border-radius: 20px;
   padding: 2.5rem 2rem;
   gap: 1.5rem;
@@ -552,6 +554,298 @@ header p {
   }
 }
 
+/* ── 步骤4：有图态 左图右文（Toolbar + SplitPane + 缩略图条）── */
+.workspace {
+  position: relative;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.workspace.dragging::after {
+  content: '松开以添加图片';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px dashed #0071e3;
+  border-radius: 20px;
+  background: rgba(0, 113, 227, 0.06);
+  color: #0071e3;
+  font-size: 1.1rem;
+  font-weight: 600;
+  pointer-events: none;
+  z-index: 20;
+}
+
+/* Toolbar */
+.toolbar {
+  background: rgba(255, 255, 255, 0.6);
+  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: blur(20px);
+  border-radius: 16px;
+  padding: 0.5rem 0.75rem;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.05);
+}
+
+.toolbar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.toolbar-actions {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.toolbar-translate {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0 auto;
+}
+
+.icon-btn {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: #1d1d1f;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.icon-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.icon-btn:hover {
+  background: rgba(0, 113, 227, 0.08);
+  color: #0071e3;
+}
+
+.icon-btn.is-active {
+  background: rgba(0, 113, 227, 0.12);
+  color: #0071e3;
+}
+
+.icon-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.3);
+}
+
+.translate-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 40px;
+  padding: 0 1rem;
+  border-radius: 99px;
+  border: 1.5px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+  color: #86868b;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.translate-toggle svg {
+  width: 18px;
+  height: 18px;
+}
+
+.translate-toggle.on {
+  border-color: transparent;
+  background: linear-gradient(135deg, #0071e3, #6200ff);
+  color: #fff;
+  box-shadow: 0 4px 12px rgba(0, 113, 227, 0.25);
+}
+
+.translate-toggle:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.3);
+}
+
+.lang-select {
+  height: 40px;
+  width: 130px;
+  padding: 0 0.75rem;
+  border: 1.5px solid rgba(0, 113, 227, 0.2);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.9);
+  font-size: 0.9rem;
+}
+
+.lang-select:focus {
+  outline: none;
+  border-color: #0071e3;
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.1);
+}
+
+.toolbar-url {
+  margin-top: 0.5rem;
+}
+
+/* SplitPane */
+.split-pane {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  height: calc(100vh - 220px);
+  min-height: 420px;
+}
+
+.split-pane__panel {
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.split-pane__panel--right {
+  flex: 1 1 0;
+}
+
+.split-pane__divider {
+  flex: 0 0 auto;
+  width: 6px;
+  margin: 0 -2px;
+  cursor: col-resize;
+  position: relative;
+  background: transparent;
+  z-index: 5;
+}
+
+.split-pane__divider::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 1px;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.08);
+  transition: width 0.2s ease, background 0.2s ease;
+}
+
+.split-pane__divider:hover::before,
+.split-pane__divider:active::before {
+  width: 3px;
+  background: linear-gradient(180deg, #0071e3, #6200ff);
+}
+
+.split-pane--stacked {
+  flex-direction: column;
+  height: auto;
+  min-height: 0;
+  gap: 1rem;
+}
+
+.split-pane--stacked .split-pane__panel {
+  width: auto !important;
+  flex-shrink: 1;
+}
+
+/* ImagePane（左栏） */
+.image-pane {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.image-pane .image-preview {
+  flex: 1 1 auto;
+  min-height: 0;
+  margin-top: 0;
+  aspect-ratio: auto;
+}
+
+.split-pane--stacked .image-pane .image-preview {
+  aspect-ratio: 4 / 3;
+  flex: 0 0 auto;
+}
+
+.thumb-strip {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.thumb-list {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 0.5rem;
+  overflow-x: auto;
+  padding: 0.25rem;
+}
+
+.thumb {
+  flex: 0 0 auto;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.thumb:hover {
+  transform: translateY(-2px);
+}
+
+.thumb.active {
+  border-color: #0071e3;
+  box-shadow: 0 4px 12px rgba(0, 113, 227, 0.25);
+}
+
+.thumb-counter {
+  flex: 0 0 auto;
+  font-size: 0.85rem;
+  color: #86868b;
+  white-space: nowrap;
+}
+
+/* ResultPane 置于右栏时脱离旧 sticky/max-height 约束 */
+.split-pane .result-section {
+  position: static;
+  top: auto;
+  max-height: none;
+  height: 100%;
+  min-height: 0;
+  opacity: 1;
+  animation: none;
+}
+
+.split-pane .result-container {
+  height: 100%;
+  min-height: 0;
+}
+
 .gradient-text {
   opacity: 1;
   color: #1d1d1f;
@@ -682,19 +976,16 @@ main {
 }
 
 main.has-content {
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 2.5rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0;
+  width: 100%;
 }
 
 .upload-section {
   width: 100%;
   max-width: 600px;
   transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.upload-section.with-image {
-  width: 300px;
 }
 
 .result-section {
@@ -715,11 +1006,6 @@ main.has-content {
 /* 修改上传区域样式 */
 .upload-zone {
   transition: all 0.3s ease;
-}
-
-.upload-section.with-image .upload-zone {
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
 }
 
 /* 修改图片预览区域样式 */
@@ -745,14 +1031,6 @@ main.has-content {
 
 /* 响应式布局 */
 @media (max-width: 768px) {
-  main.has-content {
-    flex-direction: column;
-  }
-
-  .upload-section.with-image {
-    width: 100%;
-  }
-
   .result-container {
     height: 300px;
   }

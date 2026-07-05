@@ -65,3 +65,13 @@ export function ClearIcon() {
     </svg>
   );
 }
+
+/** 翻译（A→文，沿用 ConfigModal 翻译字形） */
+export function TranslateIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 5h7M6.5 5v11M10 8c0 4.5-3.5 8.5-7 8.5M4.5 11.5c2 2 5 2.5 7.5 0" />
+      <path d="M13 20l3.5-9L20 20M14 17.5h5" />
+    </svg>
+  );
+}
