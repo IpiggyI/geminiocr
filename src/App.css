@@ -846,6 +846,166 @@ header p {
   min-height: 0;
 }
 
+/* ── 步骤5：ResultPane 双 tab + 图标按钮 + 重试 ── */
+.result-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  margin-bottom: 0.75rem;
+}
+
+.result-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.5rem 0.9rem;
+  background: transparent;
+  border: none;
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #86868b;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.result-tab.active {
+  color: #0071e3;
+}
+
+.result-tab.active::after {
+  content: '';
+  position: absolute;
+  left: 0.9rem;
+  right: 0.9rem;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 2px;
+  background: linear-gradient(135deg, #0071e3, #6200ff);
+}
+
+.result-tab:focus-visible {
+  outline: none;
+  border-radius: 8px;
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.25);
+}
+
+.tab-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(0, 113, 227, 0.25);
+  border-top-color: #0071e3;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+.tab-badge {
+  color: #e53935;
+  font-size: 0.85rem;
+}
+
+.result-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.icon-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 34px;
+  padding: 0 0.75rem;
+  border-radius: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.7);
+  color: #1d1d1f;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+}
+
+.icon-action svg {
+  width: 16px;
+  height: 16px;
+}
+
+.icon-action:hover:not(:disabled) {
+  background: rgba(0, 113, 227, 0.08);
+  color: #0071e3;
+  border-color: rgba(0, 113, 227, 0.2);
+}
+
+.icon-action:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.icon-action.copied {
+  color: #34a853;
+  border-color: rgba(52, 168, 83, 0.4);
+  background: rgba(52, 168, 83, 0.08);
+}
+
+.icon-action:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.25);
+}
+
+.result-error {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 1rem 1.25rem;
+  border-radius: 14px;
+  background: rgba(229, 57, 53, 0.05);
+  border: 1px solid rgba(229, 57, 53, 0.2);
+  color: #b71c1c;
+}
+
+.result-error strong {
+  font-size: 1rem;
+}
+
+.result-error p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #86868b;
+  word-break: break-word;
+}
+
+.retry-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  height: 38px;
+  padding: 0 1rem;
+  border: none;
+  border-radius: 99px;
+  background: linear-gradient(135deg, #0071e3, #6200ff);
+  color: #fff;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.retry-button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.retry-button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 15px rgba(0, 113, 227, 0.25);
+}
+
+.retry-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.3);
+}
+
 .gradient-text {
   opacity: 1;
   color: #1d1d1f;

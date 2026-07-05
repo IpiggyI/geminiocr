@@ -66,6 +66,43 @@ export function ClearIcon() {
   );
 }
 
+/** 复制 */
+export function CopyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="9" y="9" width="11" height="11" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+/** 对勾（复制成功） */
+export function CheckIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M20 6L9 17l-5-5" />
+    </svg>
+  );
+}
+
+/** 格式纠错（魔法棒） */
+export function CorrectIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M15 4V2M15 10V8M12.5 5.5h-2M19.5 5.5h-2M5 20l9-9M13 6l4 4" />
+    </svg>
+  );
+}
+
+/** 重试（环形箭头） */
+export function RetryIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5" />
+    </svg>
+  );
+}
+
 /** 翻译（A→文，沿用 ConfigModal 翻译字形） */
 export function TranslateIcon() {
   return (

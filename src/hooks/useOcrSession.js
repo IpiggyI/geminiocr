@@ -84,6 +84,10 @@ export const useOcrSession = () => {
   if (!abortRef.current) {
     abortRef.current = new AbortController();
   }
+  // 会话代际：clearSession 递增；流式写回前校验，防止清空后异步回调复活结果
+  const generationRef = useRef(0);
+  // 每 index 的识别尝试次数（重试计次，第 2 次起追加提示词）
+  const attemptsRef = useRef([]);
 
   /** 取消所有进行中的识别/纠错请求，后续请求使用新的控制器 */
   const cancelRecognition = useCallback(() => {
@@ -114,19 +118,23 @@ export const useOcrSession = () => {
 
   // ─── 核心动作 ───
 
-  /** 处理单张图片识别 */
-  const handleImageFile = useCallback(async (file, index) => {
+  /** 处理单张图片识别（attempt≥2 时追加重试提示词） */
+  const handleImageFile = useCallback(async (file, index, attempt = 1) => {
     if (!file || !file.type.startsWith('image/')) return;
+    const gen = generationRef.current; // 捕获本轮代际，回调前校验
+    const stale = () => generationRef.current !== gen; // 会话已被清空则丢弃写回
     // 新一轮识别：清掉该 index 上一次的错误态
     setErrors(prev => { const next = [...prev]; next[index] = ''; return next; });
     try {
       let liveText = '';
       const fullText = await recognizeImage({
         file,
+        retryHint: attempt >= 2,
         streamClient: callGeminiStream,
         onTextChunk: (chunk) => {
           liveText += chunk;
           setResults(prev => {
+            if (stale()) return prev;
             const newResults = [...prev];
             newResults[index] = liveText;
             return newResults;
@@ -135,21 +143,21 @@ export const useOcrSession = () => {
       });
 
       setResults(prev => {
+        if (stale()) return prev;
         const newResults = [...prev];
         newResults[index] = fullText;
         return newResults;
       });
 
       // 识别恒为纯 OCR；开启自动翻译时，识别完成后独立触发翻译（不阻塞识别生命周期）
-      if (translateEnabledRef.current) {
+      if (!stale() && translateEnabledRef.current) {
         translateResultRef.current?.(index, fullText);
       }
       return fullText;
     } catch (error) {
       if (error.name === 'AbortError') {
         setResults(prev => {
-          // 若数组已被 clearSession 清空/缩短，则不复活该条（避免留下幽灵结果）
-          if (index >= prev.length) return prev;
+          if (stale()) return prev; // 已 clearSession，不复活
           const newResults = [...prev];
           newResults[index] = '已取消';
           return newResults;
@@ -159,8 +167,8 @@ export const useOcrSession = () => {
       console.error('Error details:', error);
       const errorMessage = `识别失败：${error.message}`;
       // 错误进错误通道，不写入 results（避免错误文本污染识别结果）
-      setErrors(prev => { const next = [...prev]; next[index] = errorMessage; return next; });
-      toast(errorMessage, { type: 'error' });
+      setErrors(prev => { if (stale()) return prev; const next = [...prev]; next[index] = errorMessage; return next; });
+      if (!stale()) toast(errorMessage, { type: 'error' });
       throw error;
     }
   }, [callGeminiStream]);
@@ -341,6 +349,8 @@ export const useOcrSession = () => {
     const source = sourceText != null ? sourceText : results[index];
     if (!source || !source.trim()) return;
 
+    const gen = generationRef.current;
+    const stale = () => generationRef.current !== gen;
     setTranslateErrors(prev => { const next = [...prev]; next[index] = ''; return next; });
     setTranslating(prev => { const next = [...prev]; next[index] = true; return next; });
     try {
@@ -351,21 +361,36 @@ export const useOcrSession = () => {
         streamClient: callGeminiStream,
         onTextChunk: (chunk) => {
           liveText += chunk;
-          setTranslations(prev => { const next = [...prev]; next[index] = liveText; return next; });
+          setTranslations(prev => { if (stale()) return prev; const next = [...prev]; next[index] = liveText; return next; });
         },
       });
     } catch (error) {
       if (error.name === 'AbortError') return;
       console.error('翻译出错:', error);
-      setTranslateErrors(prev => { const next = [...prev]; next[index] = `翻译失败：${error.message}`; return next; });
+      setTranslateErrors(prev => { if (stale()) return prev; const next = [...prev]; next[index] = `翻译失败：${error.message}`; return next; });
     } finally {
-      setTranslating(prev => { const next = [...prev]; next[index] = false; return next; });
+      setTranslating(prev => { if (stale()) return prev; const next = [...prev]; next[index] = false; return next; });
     }
   }, [results, callGeminiStream]);
   translateResultRef.current = translateResult;
 
+  /** 重试识别：读原始 File 重跑，第 2 次尝试起追加重试提示词 */
+  const retryRecognition = useCallback(async (index) => {
+    const file = files[index];
+    if (!file) return;
+    attemptsRef.current[index] = (attemptsRef.current[index] || 1) + 1;
+    setIsLoading(true);
+    try {
+      await handleImageFile(file, index, attemptsRef.current[index]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [files, handleImageFile]);
+
   /** 清空整个会话：撤销 blob 预览 URL + 重置全部结果衍生状态 */
   const clearSession = useCallback(() => {
+    generationRef.current += 1; // 递增代际，丢弃所有进行中请求的后续写回
+    attemptsRef.current = [];
     // 撤销 createObjectURL 生成的 blob: 预览，避免内存泄漏（data: URL 无需撤销）
     images.forEach((url) => {
       if (typeof url === 'string' && url.startsWith('blob:')) {
@@ -422,6 +447,7 @@ export const useOcrSession = () => {
     processClipboardImage,
     correctCurrentText,
     translateResult,
+    retryRecognition,
     clearSession,
     handlePrevImage,
     handleNextImage,

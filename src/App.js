@@ -448,27 +448,8 @@ function App() {
     }
   };
 
-  // 在 App 组件中添加复制函数
-  const handleCopyText = () => {
-    if (results[currentIndex]) {
-      navigator.clipboard.writeText(results[currentIndex])
-        .then(() => {
-          // 可以添加一个临时的成功提示
-          const button = document.querySelector('.copy-button');
-          const originalText = button.textContent;
-          button.textContent = '已复制';
-          button.classList.add('copied');
-          
-          setTimeout(() => {
-            button.textContent = originalText;
-            button.classList.remove('copied');
-          }, 2000);
-        })
-        .catch(err => {
-          console.error('复制失败:', err);
-        });
-    }
-  };
+  // 复制文本（复制反馈由 ResultPane 的本地 state 驱动，此处只负责写剪贴板）
+  const handleCopyText = (text) => navigator.clipboard.writeText(text);
 
   return (
     <div className="app">
@@ -559,12 +540,18 @@ function App() {
               />
               <ResultPane
                 results={results}
+                translations={ocr.translations}
+                errors={ocr.errors}
+                translateErrors={ocr.translateErrors}
+                translating={ocr.translating}
                 currentIndex={currentIndex}
                 isLoading={isLoading}
                 isCorrectingText={isCorrectingText}
                 onCancel={cancelRecognition}
                 onCopy={handleCopyText}
                 onCorrect={handleCorrectText}
+                onRetry={ocr.retryRecognition}
+                onRetryTranslate={ocr.translateResult}
               />
             </SplitPane>
           </div>

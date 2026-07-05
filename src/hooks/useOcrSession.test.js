@@ -97,6 +97,65 @@ test('clearSession revokes blob previews and resets all result state', () => {
   URL.revokeObjectURL = originalRevoke;
 });
 
+test('retryRecognition re-runs with retry hint appended to prompt', async () => {
+  let lastPrompt = '';
+  streamGeminiContent.mockImplementation(async ({ prompt, onTextChunk }) => {
+    lastPrompt = prompt;
+    onTextChunk('redo');
+  });
+
+  const { result } = renderHook(() => useOcrSession());
+  withDirectConfig(result);
+  act(() => {
+    result.current.setImages(['blob:x']);
+    result.current.setResults(['']);
+    result.current.setFiles([imageFile()]);
+  });
+
+  await act(async () => {
+    await result.current.retryRecognition(0);
+    await flush();
+  });
+
+  expect(lastPrompt).toContain('上一次识别可能不完整'); // RETRY_HINT 已追加
+  expect(result.current.results[0]).toBe('redo');
+});
+
+test('retryRecognition is a no-op when the original file is missing', async () => {
+  const { result } = renderHook(() => useOcrSession());
+  withDirectConfig(result);
+
+  await act(async () => { await result.current.retryRecognition(3); });
+
+  expect(streamGeminiContent).not.toHaveBeenCalled();
+});
+
+test('clearSession drops in-flight streaming writes (no resurrection)', async () => {
+  let emit;
+  streamGeminiContent.mockImplementation(({ onTextChunk }) =>
+    new Promise((resolve) => {
+      emit = (t) => { onTextChunk(t); resolve(); };
+    })
+  );
+
+  const { result } = renderHook(() => useOcrSession());
+  withDirectConfig(result);
+  act(() => { result.current.setResults(['原文']); });
+
+  // translateResult 同步直连 streamClient，emit 立即就绪
+  let pending;
+  act(() => { pending = result.current.translateResult(0, '原文'); });
+  act(() => { result.current.clearSession(); }); // 代际递增
+
+  await act(async () => {
+    emit('迟到译文'); // 迟到的流式块
+    await pending;
+    await flush();
+  });
+
+  expect(result.current.translations).toEqual([]); // 未被复活
+});
+
 test('persists api config to localStorage across remounts', () => {
   window.localStorage.clear();
 
