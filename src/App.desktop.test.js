@@ -48,7 +48,7 @@ describe('App desktop regressions', () => {
     render(<App />);
 
     fireEvent.click(screen.getByLabelText('打开 API 配置'));
-    fireEvent.change(screen.getByPlaceholderText('Gemini API Key'), {
+    fireEvent.change(screen.getByPlaceholderText(/Gemini API Key/), {
       target: { value: 'test-key' },
     });
     fireEvent.click(screen.getByText('完成'));

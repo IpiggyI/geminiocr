@@ -62,7 +62,6 @@ export const useOcrSession = () => {
 
   const envConfig = {
     apiUrl: process.env.REACT_APP_GEMINI_API_URL || DEFAULT_GEMINI_API_URL,
-    apiKey: process.env.REACT_APP_GEMINI_API_KEY || '',
     model: process.env.REACT_APP_GEMINI_MODEL || DEFAULT_GEMINI_MODEL,
   };
 

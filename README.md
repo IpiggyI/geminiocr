@@ -29,13 +29,14 @@ https://ocr.howen.ink/
 **服务端变量（仅在 Vercel 配置，不会进入前端 bundle）**
 - `GEMINI_API_KEY`（必填）：Gemini API Key，由代理端点注入上游请求
 - `ACCESS_TOKEN`（必填）：访问口令，网页用户需在设置中填入相同值才能使用内置代理；**未配置时代理直接返回 503**
-- `GEMINI_API_URL`（可选）：代理上游 origin，默认 `https://generativelanguage.googleapis.com`
+- `GEMINI_API_URL`（可选）：代理上游基址，默认 `https://generativelanguage.googleapis.com/v1beta`；自定义镜像可照抄 `REACT_APP_GEMINI_API_URL`
 
 **构建期变量（非敏感，可选）**
 - `REACT_APP_GEMINI_API_URL`：直连模式默认基址，默认 `https://generativelanguage.googleapis.com/v1beta`
 - `REACT_APP_GEMINI_MODEL`：默认模型名，默认 `gemini-2.5-flash`
 
 > ⚠️ 不要再设置 `REACT_APP_GEMINI_API_KEY`——它会被构建期烤入公网 bundle 导致 Key 泄露，已从本项目移除。
+> 构建脚本会拦截该变量：如果环境中仍存在 `REACT_APP_GEMINI_API_KEY`，`npm start` / `npm run build` 会直接失败。
 
 网页端解析优先级：
 - 页面填了自己的 API Key → 直连 Gemini（不经代理、无需口令）
@@ -79,11 +80,10 @@ npm install
 yarn install
 ```
 
-3. 配置环境变量（本地开发用直连模式）
+3. 配置本地默认值（可选）
 
-本地 `npm start` 不带 Vercel 函数，口令代理只在 Vercel 生效。本地识别请在页面「设置」里填入自己的 API Key，或创建 `.env.local`（仅本地、不会部署）添加以下配置：
+本地 `npm start` 不带 Vercel 函数，口令代理只在 Vercel 生效。本地识别请在页面「设置」里填入自己的 API Key；如需覆盖非敏感默认值，可创建 `.env.local`（仅本地、不会部署）添加以下配置：
 ```
-REACT_APP_GEMINI_API_KEY=your_api_key_here
 REACT_APP_GEMINI_MODEL=gemini-2.5-flash
 REACT_APP_GEMINI_API_URL=https://generativelanguage.googleapis.com/v1beta
 ```

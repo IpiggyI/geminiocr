@@ -38,7 +38,7 @@ export function ConfigModal({ ocr, desktop, onClose, onSave }) {
           </svg>
           Gemini API 配置
         </h2>
-        <p className="config-modal-subtitle">桌面端和网页端共用同一套配置回落规则。页面填写优先生效，留空时自动回落到环境变量。</p>
+        <p className="config-modal-subtitle">API URL 和 Model 留空时回落到环境变量；API Key 只使用页面填写值。</p>
 
         <div className="api-config-grid">
           {/* API URL 字段 */}
@@ -69,14 +69,14 @@ export function ConfigModal({ ocr, desktop, onClose, onSave }) {
                 <span className="config-field-label">API Key</span>
               </div>
               <span className={`config-field-badge ${apiKeyConfig ? 'config-field-badge--custom' : 'config-field-badge--env'}`}>
-                {apiKeyConfig ? '自定义' : '环境变量'}
+                {apiKeyConfig ? '自定义' : '未填写'}
               </span>
             </div>
             <input
               type="password"
               value={apiKeyConfig}
               onChange={(e) => setApiKeyConfig(e.target.value)}
-              placeholder="Gemini API Key"
+              placeholder="填写自己的 Gemini API Key（直连）"
               className="api-config-input"
               autoComplete="off"
             />

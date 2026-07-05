@@ -85,9 +85,9 @@ const isCompact = isMobile && !desktopMode;               // App.js
 
 ```js
 const model = (modelConfig.trim() || envConfig.model).replace(/^models\//, '');
-const apiKey = apiKeyConfig.trim() || envConfig.apiKey;
+const apiKey = apiKeyConfig.trim();
 
-if (apiKey) {                       // 有 Key（页面/环境变量）→ 直连
+if (apiKey) {                       // 页面填 Key → 直连；不读取 REACT_APP_GEMINI_API_KEY
   return { mode: 'direct', apiUrl: apiUrlConfig.trim() || envConfig.apiUrl, apiKey, model };
 }
 if (isTauri) {                      // 桌面端无 Key → 抛缺 Key 引导（不走代理）
@@ -98,7 +98,7 @@ if (!accessToken) throw new Error('缺少访问口令，请在设置中填入访
 return { mode: 'proxy', apiUrl: PROXY_API_BASE, accessToken, model };
 ```
 
-要点：**Key 优先直连、Web 端缺 Key 回落到口令保护的服务端代理（`/api/gemini`，见 `api/gemini/[...path].js`）、桌面端恒直连**。新增可配置项时沿用 `pageConfig.trim() || envConfig.x` 的回落写法，并在解析器里集中校验；返回联合形状用 `mode` 判别，别让调用方猜。
+要点：**页面 Key 优先直连、Web 端缺 Key 回落到口令保护的服务端代理（`/api/gemini`，见 `api/gemini.js`）、桌面端恒直连**。敏感 Key 不走 `REACT_APP_*` 构建期变量，`scripts/check-env-safety.js` 必须在 `prestart` / `prebuild` 拦截 `REACT_APP_GEMINI_API_KEY`；新增非敏感可配置项时沿用 `pageConfig.trim() || envConfig.x` 的回落写法，并在解析器里集中校验；返回联合形状用 `mode` 判别，别让调用方猜。
 
 ---
 

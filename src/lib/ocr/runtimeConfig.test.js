@@ -1,9 +1,10 @@
 import { createRuntimeConfigResolver, buildGeminiEndpoint } from './runtimeConfig';
+const { findUnsafePublicEnv } = require('../../../scripts/check-env-safety');
 
 describe('createRuntimeConfigResolver', () => {
   test('prefers page config over env config (direct mode)', () => {
     const resolve = createRuntimeConfigResolver({
-      envConfig: { apiUrl: 'env-url', apiKey: 'env-key', model: 'env-model' },
+      envConfig: { apiUrl: 'env-url', model: 'env-model' },
     });
     expect(resolve({
       apiUrlConfig: 'page-url',
@@ -17,18 +18,20 @@ describe('createRuntimeConfigResolver', () => {
     });
   });
 
-  test('falls back to env config when page config is empty (direct mode)', () => {
+  test('uses proxy mode when page key is empty on web', () => {
     const resolve = createRuntimeConfigResolver({
-      envConfig: { apiUrl: 'env-url', apiKey: 'env-key', model: 'env-model' },
+      envConfig: { apiUrl: 'env-url', model: 'env-model' },
+      isTauri: false,
     });
     expect(resolve({
       apiUrlConfig: '',
       apiKeyConfig: '',
       modelConfig: '',
+      accessTokenConfig: 'access-token',
     })).toEqual({
-      mode: 'direct',
-      apiUrl: 'env-url',
-      apiKey: 'env-key',
+      mode: 'proxy',
+      apiUrl: '/api/gemini',
+      accessToken: 'access-token',
       model: 'env-model',
     });
   });
@@ -105,5 +108,16 @@ describe('buildGeminiEndpoint', () => {
     const url = buildGeminiEndpoint('/api/gemini', 'gemini-2.5-flash', '');
     expect(url).toBe('/api/gemini/models/gemini-2.5-flash:streamGenerateContent?alt=sse');
     expect(url).not.toContain('key=');
+  });
+});
+
+describe('public env safety', () => {
+  test('rejects public Gemini API key env name', () => {
+    expect(findUnsafePublicEnv({ REACT_APP_GEMINI_API_KEY: 'key' }))
+      .toEqual(['REACT_APP_GEMINI_API_KEY']);
+  });
+
+  test('allows server-side Gemini API key env name', () => {
+    expect(findUnsafePublicEnv({ GEMINI_API_KEY: 'key' })).toEqual([]);
   });
 });

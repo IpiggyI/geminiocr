@@ -52,6 +52,7 @@ test('persists api config to localStorage across remounts', () => {
     result.current.setApiKeyConfig('persisted-key');
     result.current.setApiUrlConfig('https://example.com');
     result.current.setModelConfig('gemini-2.5-pro');
+    result.current.setAccessTokenConfig('persisted-token');
   });
 
   unmount();
@@ -61,4 +62,5 @@ test('persists api config to localStorage across remounts', () => {
   expect(nextResult.current.apiKeyConfig).toBe('persisted-key');
   expect(nextResult.current.apiUrlConfig).toBe('https://example.com');
   expect(nextResult.current.modelConfig).toBe('gemini-2.5-pro');
+  expect(nextResult.current.accessTokenConfig).toBe('persisted-token');
 });

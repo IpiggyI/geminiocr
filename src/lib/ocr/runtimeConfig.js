@@ -37,17 +37,17 @@ export const buildGeminiEndpoint = (apiUrl, model, apiKey) => {
 
 /**
  * 创建运行时配置解析器，返回带 mode 的配置：
- * - 有 Key（页面或环境变量）→ { mode: 'direct', apiUrl, apiKey, model } 直连
+ * - 页面填写 Key → { mode: 'direct', apiUrl, apiKey, model } 直连
  * - 无 Key + 桌面端 → 抛「缺少 API Key」（桌面端不走代理）
  * - 无 Key + Web 端 → { mode: 'proxy', apiUrl: 代理基址, accessToken, model }，缺口令则抛错
- * @param {{ envConfig: { apiUrl: string, apiKey: string, model: string }, isTauri?: boolean, proxyApiUrl?: string }} options
+ * @param {{ envConfig: { apiUrl: string, model: string }, isTauri?: boolean, proxyApiUrl?: string }} options
  */
 export const createRuntimeConfigResolver = ({ envConfig, isTauri = false, proxyApiUrl = PROXY_API_BASE }) => {
   return ({ apiUrlConfig, apiKeyConfig, modelConfig, accessTokenConfig = '' }) => {
     const model = (modelConfig.trim() || envConfig.model).replace(/^models\//, '');
-    const apiKey = apiKeyConfig.trim() || envConfig.apiKey;
+    const apiKey = apiKeyConfig.trim();
 
-    // 有 Key → 直连（页面配置优先，环境变量兜底）
+    // 页面填 Key → 直连；构建期不再读取 REACT_APP_GEMINI_API_KEY，避免误配即泄露
     if (apiKey) {
       const apiUrl = apiUrlConfig.trim() || envConfig.apiUrl;
       return { mode: 'direct', apiUrl, apiKey, model };

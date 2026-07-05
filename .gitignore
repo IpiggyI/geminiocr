@@ -25,3 +25,8 @@ yarn-error.log*
 
 # generated pdf.js worker (copied by scripts/copy-pdf-worker.js)
 /public/pdf.worker.min.js
+
+# agent memory
+.memory/
+.vercel
+.env*
