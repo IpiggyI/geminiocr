@@ -12,6 +12,7 @@ export function ConfigModal({ ocr, desktop, onClose, onSave }) {
     apiUrlConfig, setApiUrlConfig,
     apiKeyConfig, setApiKeyConfig,
     modelConfig, setModelConfig,
+    accessTokenConfig, setAccessTokenConfig,
     translateEnabled, setTranslateEnabled,
     translateLang, setTranslateLang,
     envConfig,
@@ -100,6 +101,30 @@ export function ConfigModal({ ocr, desktop, onClose, onSave }) {
               className="api-config-input"
             />
           </label>
+
+          {/* 访问口令字段 — 仅 Web 端：未填 Key 时走内置代理需口令 */}
+          {!desktop.enabled && (
+            <label className={`config-field${accessTokenConfig ? ' config-field--custom' : ''}`}>
+              <div className="config-field-header">
+                <div className="config-field-header-left">
+                  <svg className="config-field-icon" viewBox="0 0 16 16" fill="none"><path d="M8 1a3 3 0 0 0-3 3v2H4a1 1 0 0 0-1 1v6a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V7a1 1 0 0 0-1-1h-1V4a3 3 0 0 0-3-3Zm1.5 5h-3V4a1.5 1.5 0 0 1 3 0v2Z" fill="currentColor"/></svg>
+                  <span className="config-field-label">访问口令</span>
+                </div>
+                <span className={`config-field-badge ${accessTokenConfig ? 'config-field-badge--custom' : 'config-field-badge--env'}`}>
+                  {accessTokenConfig ? '已填写' : '未填写'}
+                </span>
+              </div>
+              <input
+                type="password"
+                value={accessTokenConfig}
+                onChange={(e) => setAccessTokenConfig(e.target.value)}
+                placeholder="未填 Key 时用访问口令走内置代理"
+                className="api-config-input"
+                autoComplete="off"
+              />
+              <span className="config-field-note">留空则需填写自己的 API Key；填写后可直接使用内置 Gemini 通道</span>
+            </label>
+          )}
 
           {desktop.enabled && (
             <label className={`config-field${desktop.shortcutConfig !== DEFAULT_DESKTOP_SHORTCUT ? ' config-field--custom' : ''}`}>
@@ -196,6 +221,7 @@ export function ConfigModal({ ocr, desktop, onClose, onSave }) {
               setApiUrlConfig('');
               setApiKeyConfig('');
               setModelConfig('');
+              setAccessTokenConfig('');
               setTranslateEnabled(false);
               setTranslateLang('中文');
               desktop.setShortcutConfig(DEFAULT_DESKTOP_SHORTCUT);

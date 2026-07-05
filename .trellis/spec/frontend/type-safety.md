@@ -42,7 +42,7 @@ export const recognizeImage = async ({ file, translateLang, streamClient, onText
 if (!file || !file.type.startsWith('image/')) return '';
 
 // 必填校验：缺 key 抛出中文可读错误
-if (!apiKey) throw new Error('缺少 Gemini API Key，请在页面配置或环境变量 REACT_APP_GEMINI_API_KEY 中设置');
+if (!apiKey && isTauri) throw new Error('缺少 Gemini API Key，请在设置中填入 API Key');
 
 // 环境守卫：无 window 时安全退出
 if (typeof window === 'undefined') return '';

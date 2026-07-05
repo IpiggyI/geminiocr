@@ -57,4 +57,37 @@ describe('streamGeminiContent', () => {
       signal: new AbortController().signal,
     })).rejects.toMatchObject({ name: 'AbortError' });
   });
+
+  test('merges custom headers (access token) into fetch', async () => {
+    global.fetch = jest.fn().mockResolvedValue(createSseResponse([
+      'data: {"candidates":[{"content":{"parts":[{"text":"hi"}]}}]}',
+    ]));
+
+    await streamGeminiContent({
+      endpoint: '/api/gemini/v1beta/models/x:streamGenerateContent?alt=sse',
+      prompt: 'p',
+      onTextChunk: () => {},
+      headers: { 'x-access-token': 'secret' },
+    });
+
+    expect(global.fetch.mock.calls[0][1].headers).toMatchObject({
+      'Content-Type': 'application/json',
+      'x-access-token': 'secret',
+    });
+  });
+
+  test('throws error carrying http status on non-ok response', async () => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      json: async () => ({ error: { message: 'Invalid access token' } }),
+    });
+
+    await expect(streamGeminiContent({
+      endpoint: '/api/gemini/v1beta/models/x:streamGenerateContent',
+      prompt: 'p',
+      onTextChunk: () => {},
+    })).rejects.toMatchObject({ status: 401 });
+  });
 });

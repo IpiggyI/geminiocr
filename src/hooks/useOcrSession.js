@@ -5,11 +5,14 @@ import { recognizeImage } from '../lib/ocr/recognizeImage';
 import { correctText } from '../lib/ocr/correctText';
 import { dataUrlToFile } from '../lib/files/dataUrlToFile';
 import { pdfToImageDataUrls } from '../lib/pdf/pdfToImageDataUrls';
+import { isTauri } from '../desktop/tauriBridge';
+import { toast } from '../components/Toast';
 
 const API_CONFIG_STORAGE_KEYS = {
   apiUrl: 'geminiocr-api-url-config',
   apiKey: 'geminiocr-api-key-config',
   model: 'geminiocr-model-config',
+  accessToken: 'geminiocr-access-token',
 };
 
 const readStoredValue = (key) => {
@@ -50,10 +53,12 @@ export const useOcrSession = () => {
   const [apiUrlConfig, setApiUrlConfig] = useState(() => readStoredValue(API_CONFIG_STORAGE_KEYS.apiUrl));
   const [apiKeyConfig, setApiKeyConfig] = useState(() => readStoredValue(API_CONFIG_STORAGE_KEYS.apiKey));
   const [modelConfig, setModelConfig] = useState(() => readStoredValue(API_CONFIG_STORAGE_KEYS.model));
+  const [accessTokenConfig, setAccessTokenConfig] = useState(() => readStoredValue(API_CONFIG_STORAGE_KEYS.accessToken));
 
   useEffect(() => { writeStoredValue(API_CONFIG_STORAGE_KEYS.apiUrl, apiUrlConfig); }, [apiUrlConfig]);
   useEffect(() => { writeStoredValue(API_CONFIG_STORAGE_KEYS.apiKey, apiKeyConfig); }, [apiKeyConfig]);
   useEffect(() => { writeStoredValue(API_CONFIG_STORAGE_KEYS.model, modelConfig); }, [modelConfig]);
+  useEffect(() => { writeStoredValue(API_CONFIG_STORAGE_KEYS.accessToken, accessTokenConfig); }, [accessTokenConfig]);
 
   const envConfig = {
     apiUrl: process.env.REACT_APP_GEMINI_API_URL || DEFAULT_GEMINI_API_URL,
@@ -63,6 +68,7 @@ export const useOcrSession = () => {
 
   const resolveConfig = createRuntimeConfigResolver({
     envConfig,
+    isTauri: isTauri(),
   });
 
   // ─── 取消控制 ───
@@ -81,14 +87,22 @@ export const useOcrSession = () => {
 
   // ─── 流式请求客户端 ───
   const callGeminiStream = useCallback(async ({ prompt, imageData, mimeType, onTextChunk }) => {
-    const { apiUrl, apiKey, model } = resolveConfig({ apiUrlConfig, apiKeyConfig, modelConfig });
-    const endpoint = buildGeminiEndpoint(apiUrl, model, apiKey);
-    return streamGeminiContent({
-      endpoint, prompt, imageData, mimeType, onTextChunk,
-      signal: abortRef.current.signal,
-    });
+    const resolved = resolveConfig({ apiUrlConfig, apiKeyConfig, modelConfig, accessTokenConfig });
+    const endpoint = buildGeminiEndpoint(resolved.apiUrl, resolved.model, resolved.apiKey);
+    const headers = resolved.mode === 'proxy' ? { 'x-access-token': resolved.accessToken } : undefined;
+    try {
+      return await streamGeminiContent({
+        endpoint, prompt, imageData, mimeType, onTextChunk, headers,
+        signal: abortRef.current.signal,
+      });
+    } catch (error) {
+      if (error.status === 401) {
+        toast('访问口令无效，请在设置中检查访问口令', { type: 'error' });
+      }
+      throw error;
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apiUrlConfig, apiKeyConfig, modelConfig]);
+  }, [apiUrlConfig, apiKeyConfig, modelConfig, accessTokenConfig]);
 
   // ─── 核心动作 ───
 
@@ -320,6 +334,7 @@ export const useOcrSession = () => {
     apiUrlConfig, setApiUrlConfig,
     apiKeyConfig, setApiKeyConfig,
     modelConfig, setModelConfig,
+    accessTokenConfig, setAccessTokenConfig,
     envConfig,
 
     // 动作

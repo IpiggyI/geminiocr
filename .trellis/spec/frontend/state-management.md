@@ -81,16 +81,24 @@ const isCompact = isMobile && !desktopMode;               // App.js
 
 ## 配置回落链（一种配置状态解析）
 
-运行时配置遵循**页面配置优先、环境变量兜底**，用工厂函数解析（`src/lib/ocr/runtimeConfig.js`）：
+运行时配置遵循**页面配置优先、环境变量兜底**，用工厂函数解析（`src/lib/ocr/runtimeConfig.js`）。解析器返回**带 `mode` 判别字段**的配置对象，调用方（`useOcrSession.callGeminiStream`）据此决定直连还是走服务端代理：
 
 ```js
-const apiUrl = apiUrlConfig.trim() || envConfig.apiUrl;
-const apiKey = apiKeyConfig.trim() || envConfig.apiKey;
 const model = (modelConfig.trim() || envConfig.model).replace(/^models\//, '');
-if (!apiKey) throw new Error('缺少 Gemini API Key，请在页面配置或环境变量 ... 中设置');
+const apiKey = apiKeyConfig.trim() || envConfig.apiKey;
+
+if (apiKey) {                       // 有 Key（页面/环境变量）→ 直连
+  return { mode: 'direct', apiUrl: apiUrlConfig.trim() || envConfig.apiUrl, apiKey, model };
+}
+if (isTauri) {                      // 桌面端无 Key → 抛缺 Key 引导（不走代理）
+  throw new Error('缺少 Gemini API Key，请在设置中填入 API Key');
+}
+const accessToken = accessTokenConfig.trim();   // Web 端无 Key → 口令代理
+if (!accessToken) throw new Error('缺少访问口令，请在设置中填入访问口令');
+return { mode: 'proxy', apiUrl: PROXY_API_BASE, accessToken, model };
 ```
 
-新增可配置项时沿用 `pageConfig.trim() || envConfig.x` 的回落写法，并在解析器里集中校验。
+要点：**Key 优先直连、Web 端缺 Key 回落到口令保护的服务端代理（`/api/gemini`，见 `api/gemini/[...path].js`）、桌面端恒直连**。新增可配置项时沿用 `pageConfig.trim() || envConfig.x` 的回落写法，并在解析器里集中校验；返回联合形状用 `mode` 判别，别让调用方猜。
 
 ---
 
