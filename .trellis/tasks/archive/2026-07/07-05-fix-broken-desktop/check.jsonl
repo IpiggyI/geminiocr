@@ -1,0 +1,4 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "检查基线：Jest+RTL 测试、ESLint、错误处理与日志、审查清单——核对 preprocessText 回归测试与整体质量门"}
+{"file": ".trellis/spec/frontend/desktop-integration.md", "reason": "校验 Tauri 桥接约定是否被遵守（isTauri 守卫、动态 import、web 安全降级、showAndFocusWindow 改 invoke 后仍 no-op on web）"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "校验 JS↔Rust command 边界数据流一致、capabilities 与实际 invoke 调用面匹配"}
+{"file": ".trellis/tasks/07-05-desktop-overhaul/research/health-check-report.md", "reason": "逐条核对体检报告中的断裂项是否已修复，防止漏项"}

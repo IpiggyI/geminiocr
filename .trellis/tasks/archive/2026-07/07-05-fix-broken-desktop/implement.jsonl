@@ -1,0 +1,6 @@
+{"file": ".trellis/tasks/07-05-desktop-overhaul/research/health-check-report.md", "reason": "需求源头：本任务要修的全部功能性断裂项（托盘/关闭隐藏/快捷键/拖拽/窗口记忆/pdf-icon/preprocessText）的根因与代码定位"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端分层心智模型与新代码落位（App→hooks→lib→desktop），判断改动放哪一层"}
+{"file": ".trellis/spec/frontend/desktop-integration.md", "reason": "Tauri 桥接层核心约定：isTauri() 守卫、动态 import、结构化结果、App 层编排——托盘/窗口生命周期收编到 Rust 侧与 tauriBridge.showAndFocusWindow 改 invoke 的直接依据"}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "快捷键 handler 链、useCallback 依赖、ref 镜像、依赖注入——影响 App.js 移除 windowBootstrap effect 与 initDesktopShortcut 链路"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "App.js effect/ref cleanup 与派生状态改动约束，删除 windowBootstrap 相关 effect 时遵循"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "JS↔Rust command 边界（新增 show_main_window，invoke 调用面）数据流与 capabilities 同步的跨层检查"}
