@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "访问口令 localStorage 持久化与配置回落链（页面 Key → 代理模式）须遵循现有配置分层约定"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "ConfigModal 新增口令字段、401 toast 提示需遵循受控组件与 Toast 约定"}
+{"file": ".trellis/spec/frontend/desktop-integration.md", "reason": "桌面端零影响：isTauri() 守卫恒直连、口令字段 Web 端才显示"}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "新增解析优先级与口令头测试须遵循 Jest + RTL 测试约定"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "前端 streamGeminiContent ↔ 代理端点 ↔ Gemini API 三层数据流与契约变更"}
