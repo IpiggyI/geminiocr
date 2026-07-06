@@ -1,0 +1,5 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "检查基线：Jest+RTL 测试同目录同名、错误处理与日志、审查清单、ESLint"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "验收无障碍：图标按钮 aria-label/键盘可达、Toast、受控组件是否合规"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "校验 results[] 语义不变、translations[] 向后兼容、状态分层落位是否符合规范"}
+{"file": ".trellis/tasks/07-05-desktop-overhaul/research/health-check-report.md", "reason": "对照验收：M1/M3/S5 是否关闭、#5/#4/#8 决策是否落地"}

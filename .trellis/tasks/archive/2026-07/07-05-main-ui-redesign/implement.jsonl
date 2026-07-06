@@ -1,0 +1,6 @@
+{"_example": "Fill with {\"file\": \"<path>\", \"reason\": \"<why>\"}. Put spec/research files only — no code paths. Run `python3 .trellis/scripts/get_context.py --mode packages` to list available specs. Delete this line once real entries are added."}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "组件拆分：具名导出、受控组件、Toast、无障碍(aria-label 图标按钮)——本批析出 Toolbar/UploadDropzone/ImagePane/ResultPane 的规范依据"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "新增 translations[]/errors[]/files[] 的状态分层落位（进 useOcrSession 还是组件本地）、不可变更新、localStorage(分隔比例)"}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "useOcrSession 扩展 translateResult：useCallback 依赖、ref 镜像(translateEnabledRef)、AbortController、翻译流式写入"}
+{"file": ".trellis/spec/frontend/desktop-integration.md", "reason": "需求 6 两端一致：isTauri 分支、桌面端不进紧凑模式的守卫写法"}
+{"file": ".trellis/tasks/07-05-desktop-overhaul/research/health-check-report.md", "reason": "决策依据：#5 布局/#4 两段式翻译/#8 断点打架/M1 错误通道/M3 复制反馈/S5 preprocessText"}
