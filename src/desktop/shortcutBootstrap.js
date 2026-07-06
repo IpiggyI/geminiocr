@@ -19,14 +19,16 @@ const registerShortcut = async (shortcut, onTriggered) => {
 
 export const applyDesktopShortcut = async ({ shortcut, onTriggered }) => {
   const activeShortcut = normalizeDesktopShortcut(shortcut);
+  const previousShortcut = registeredShortcut;
 
   if (!isTauri()) {
     return { ok: true, activeShortcut };
   }
 
   try {
-    if (registeredShortcut) {
-      await unregisterShortcut(registeredShortcut);
+    if (previousShortcut) {
+      await unregisterShortcut(previousShortcut);
+      registeredShortcut = null;
     }
 
     await registerShortcut(activeShortcut, onTriggered);
@@ -34,6 +36,15 @@ export const applyDesktopShortcut = async ({ shortcut, onTriggered }) => {
 
     return { ok: true, activeShortcut };
   } catch (error) {
+    if (previousShortcut && registeredShortcut === null) {
+      try {
+        await registerShortcut(previousShortcut, onTriggered);
+        registeredShortcut = previousShortcut;
+      } catch (rollbackError) {
+        console.error('回滚桌面快捷键失败:', rollbackError);
+      }
+    }
+
     return {
       ok: false,
       activeShortcut: registeredShortcut || activeShortcut,

@@ -139,6 +139,7 @@ function App() {
       if (!shouldHandleGlobalPasteEvent(e)) return;
 
       const items = Array.from(e.clipboardData?.items || []);
+      let nextImageIndex = images.length;
       
       for (const item of items) {
         // 处理图片
@@ -149,7 +150,8 @@ function App() {
             setIsLoading(true);
             try {
               const imageUrl = URL.createObjectURL(file);
-              const newIndex = images.length;
+              const newIndex = nextImageIndex;
+              nextImageIndex += 1;
               
               setImages(prev => [...prev, imageUrl]);
               setResults(prev => [...prev, '']);
@@ -304,8 +306,7 @@ function App() {
     e.stopPropagation();
     setIsDragging(false);
     setIsDraggingGlobal(false);
-    setIsLoading(true);
-    
+
     try {
       const items = Array.from(e.dataTransfer.items);
       const filePromises = items.map(async (item) => {
@@ -322,23 +323,10 @@ function App() {
       });
 
       const files = (await Promise.all(filePromises)).filter(file => file !== null);
-      const startIndex = images.length;
-      
-      const imageUrls = files.map(file => URL.createObjectURL(file));
-      setImages(prev => [...prev, ...imageUrls]);
-      setResults(prev => [...prev, ...new Array(files.length).fill('')]);
-      setCurrentIndex(startIndex);
-
-      // 逐批处理（最多 5 个并发）
-      const maxConcurrent = 5;
-      for (let i = 0; i < files.length; i += maxConcurrent) {
-        const batch = files.slice(i, i + maxConcurrent);
-        await Promise.all(batch.map((file, idx) => handleFile(file, startIndex + i + idx)));
-      }
+      // 占位/PDF 展开/索引偏移统一走 uploadFiles，拖拽不再自建占位（修混合 PDF 索引错位 + PDF 预览裂图）
+      await uploadFiles(files);
     } catch (error) {
       console.error('Error processing dropped files:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -487,7 +475,6 @@ function App() {
             className="settings-link"
             aria-label="打开设置"
             onClick={openSettings}
-            style={{ display: isCompact ? 'none' : 'flex' }}
           >
             <SettingsIcon />
           </button>

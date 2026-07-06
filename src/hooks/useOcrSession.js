@@ -41,6 +41,17 @@ const writeStoredValue = (key, value) => {
   }
 };
 
+const revokePreviewUrl = (url) => {
+  if (typeof URL === 'undefined' || typeof URL.revokeObjectURL !== 'function') return;
+  if (typeof url === 'string' && url.startsWith('blob:')) {
+    URL.revokeObjectURL(url);
+  }
+};
+
+const revokePreviewUrls = (urls) => {
+  urls.forEach(revokePreviewUrl);
+};
+
 /**
  * 统一管理 OCR 会话状态与动作
  * Web 端和 Desktop 端共用
@@ -215,32 +226,43 @@ export const useOcrSession = ({ onNeedApiKey } = {}) => {
 
   /** 处理 PDF 文件 */
   const handlePdfFile = useCallback(async (file, startIndex) => {
+    const gen = generationRef.current;
+    const stale = () => generationRef.current !== gen;
     try {
       const pdfImages = await pdfToImageDataUrls(file);
+      if (stale()) return 0;
 
       setImages(prev => {
+        if (stale()) return prev;
         const newImages = [...prev];
         newImages.splice(startIndex, 1, ...pdfImages);
         return newImages;
       });
       setResults(prev => {
+        if (stale()) return prev;
         const newResults = [...prev];
         newResults.splice(startIndex, 1, ...new Array(pdfImages.length).fill('正在识别中...'));
         return newResults;
       });
 
       const batchSize = 6;
-      const allResults = [];
       const signal = abortRef.current.signal;
 
       for (let i = 0; i < pdfImages.length; i += batchSize) {
-        if (signal.aborted) break;
+        if (signal.aborted || stale()) break;
         try {
           const batch = pdfImages.slice(i, i + batchSize);
           const batchPromises = batch.map(async (imgDataUrl, batchIndex) => {
             const pageIndex = i + batchIndex;
             try {
               const imageFile = await dataUrlToFile(imgDataUrl, `page_${pageIndex + 1}.jpg`, 'image/jpeg');
+              if (signal.aborted || stale()) return '';
+              setFiles(prev => {
+                if (stale()) return prev;
+                const next = [...prev];
+                next[startIndex + pageIndex] = imageFile;
+                return next;
+              });
               return handleImageFile(imageFile, startIndex + pageIndex);
             } catch (error) {
               console.error(`处理PDF第 ${pageIndex + 1} 页图片时出错:`, error);
@@ -248,17 +270,15 @@ export const useOcrSession = ({ onNeedApiKey } = {}) => {
             }
           });
 
-          const batchResults = await Promise.allSettled(batchPromises);
-          allResults.push(...batchResults.map(r =>
-            r.status === 'fulfilled' ? r.value : `处理失败: ${r.reason}`
-          ));
+          await Promise.allSettled(batchPromises);
         } catch (batchError) {
           console.error('处理PDF批次时出错:', batchError);
         }
       }
 
-      return allResults.filter(Boolean).join('\n\n---\n\n');
+      return pdfImages.length;
     } catch (error) {
+      if (stale()) return 0;
       console.error('PDF处理错误:', error);
       throw new Error(`PDF处理失败: ${error.message}`);
     }
@@ -266,42 +286,50 @@ export const useOcrSession = ({ onNeedApiKey } = {}) => {
 
   /** 统一文件处理入口 */
   const handleFile = useCallback(async (file, index) => {
+    const gen = generationRef.current;
+    const stale = () => generationRef.current !== gen;
     // 记录原始文件引用，供后续「重试识别」重跑同一文件
     if (index >= 0) {
-      setFiles(prev => { const next = [...prev]; next[index] = file; return next; });
+      setFiles(prev => { if (stale()) return prev; const next = [...prev]; next[index] = file; return next; });
     }
     try {
-      let content = '';
+      let handledCount = 1;
       if (file.type === 'application/pdf') {
-        content = await handlePdfFile(file, index);
+        handledCount = await handlePdfFile(file, index);
       } else if (file.type.startsWith('image/')) {
-        content = await handleImageFile(file, index);
+        const content = await handleImageFile(file, index);
+        if (index >= 0 && !stale()) {
+          setResults(prev => {
+            if (stale()) return prev;
+            const newResults = [...prev];
+            newResults[index] = content;
+            return newResults;
+          });
+        }
       } else {
         throw new Error('不支持的文件类型');
       }
 
-      if (index >= 0 && !file.type.startsWith('application/pdf')) {
-        setResults(prev => {
-          const newResults = [...prev];
-          newResults[index] = content;
-          return newResults;
-        });
-      }
+      return handledCount;
     } catch (error) {
       console.error('处理文件时出错:', error);
       // 错误进错误通道；若 handleImageFile 已记录则不覆盖（避免双写、保留更具体信息）
-      if (index >= 0) {
+      if (index >= 0 && !stale()) {
         setErrors(prev => {
+          if (stale()) return prev;
           const next = [...prev];
           if (!next[index]) next[index] = `处理失败：${error.message}`;
           return next;
         });
       }
+      return 1;
     }
   }, [handleImageFile, handlePdfFile]);
 
   /** 上传多文件 */
   const uploadFiles = useCallback(async (files) => {
+    const gen = generationRef.current;
+    const stale = () => generationRef.current !== gen;
     setIsLoading(true);
     try {
       const startIndex = images.length;
@@ -319,14 +347,23 @@ export const useOcrSession = ({ onNeedApiKey } = {}) => {
         return '';
       }));
 
+      if (stale()) {
+        revokePreviewUrls(previews);
+        return;
+      }
+
       setImages(prev => [...prev, ...previews]);
       setResults(prev => [...prev, ...new Array(validFiles.length).fill('')]);
       setCurrentIndex(startIndex);
 
       const signal = abortRef.current.signal;
+      let indexOffset = 0;
       for (let i = 0; i < validFiles.length; i++) {
-        if (signal.aborted) break;
-        await handleFile(validFiles[i], startIndex + i);
+        if (signal.aborted || stale()) break;
+        const handledCount = await handleFile(validFiles[i], startIndex + i + indexOffset);
+        if (validFiles[i].type === 'application/pdf') {
+          indexOffset += (handledCount || 0) - 1;
+        }
       }
     } catch (error) {
       console.error('处理文件时出错:', error);
@@ -339,15 +376,22 @@ export const useOcrSession = ({ onNeedApiKey } = {}) => {
   const processClipboardImage = useCallback(async (file) => {
     if (!file || !file.type.startsWith('image/')) return null;
 
+    const gen = generationRef.current;
+    const stale = () => generationRef.current !== gen;
     setIsLoading(true);
     try {
       const imageUrl = URL.createObjectURL(file);
       const newIndex = images.length;
+      if (stale()) {
+        revokePreviewUrl(imageUrl);
+        return null;
+      }
 
-      setImages(prev => [...prev, imageUrl]);
-      setResults(prev => [...prev, '']);
-      setCurrentIndex(newIndex);
+      setImages(prev => { if (stale()) return prev; return [...prev, imageUrl]; });
+      setResults(prev => { if (stale()) return prev; return [...prev, '']; });
+      if (!stale()) setCurrentIndex(newIndex);
 
+      if (stale()) return null;
       await handleFile(file, newIndex);
       return newIndex;
     } catch (error) {
@@ -362,6 +406,8 @@ export const useOcrSession = ({ onNeedApiKey } = {}) => {
   const correctCurrentText = useCallback(async () => {
     if (!results[currentIndex] || isCorrectingText) return;
 
+    const gen = generationRef.current;
+    const stale = () => generationRef.current !== gen;
     setIsCorrectingText(true);
     try {
       let liveText = '';
@@ -372,6 +418,7 @@ export const useOcrSession = ({ onNeedApiKey } = {}) => {
         onTextChunk: (chunk) => {
           liveText += chunk;
           setResults(prev => {
+            if (stale()) return prev;
             const newResults = [...prev];
             newResults[currentIndex] = liveText;
             return newResults;
@@ -379,7 +426,9 @@ export const useOcrSession = ({ onNeedApiKey } = {}) => {
         },
       });
     } catch (error) {
+      if (error.name === 'AbortError' || stale()) return;
       console.error('纠错过程出错:', error);
+      toast(`纠错失败：${error.message}`, { type: 'error' });
     } finally {
       setIsCorrectingText(false);
     }
@@ -434,11 +483,7 @@ export const useOcrSession = ({ onNeedApiKey } = {}) => {
     generationRef.current += 1; // 递增代际，丢弃所有进行中请求的后续写回
     attemptsRef.current = [];
     // 撤销 createObjectURL 生成的 blob: 预览，避免内存泄漏（data: URL 无需撤销）
-    images.forEach((url) => {
-      if (typeof url === 'string' && url.startsWith('blob:')) {
-        URL.revokeObjectURL(url);
-      }
-    });
+    revokePreviewUrls(images);
     cancelRecognition(); // 中止进行中的识别/纠错请求，并复位 loading 态
     setImages([]);
     setResults([]);

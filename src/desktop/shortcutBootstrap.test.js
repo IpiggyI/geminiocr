@@ -55,6 +55,31 @@ describe('shortcutBootstrap', () => {
     expect(register).toHaveBeenLastCalledWith('Alt+Shift+Y', expect.any(Function));
   });
 
+  test('failed shortcut update restores the previous registration', async () => {
+    register.mockResolvedValueOnce(undefined);
+    await applyDesktopShortcut({
+      shortcut: 'Alt+Shift+X',
+      onTriggered: jest.fn(),
+    });
+
+    register.mockClear();
+    unregister.mockClear();
+    register
+      .mockRejectedValueOnce(new Error('busy'))
+      .mockResolvedValueOnce(undefined);
+
+    const result = await applyDesktopShortcut({
+      shortcut: 'Alt+Shift+Y',
+      onTriggered: jest.fn(),
+    });
+
+    expect(result.ok).toBe(false);
+    expect(result.activeShortcut).toBe('Alt+Shift+X');
+    expect(unregister).toHaveBeenCalledWith('Alt+Shift+X');
+    expect(register).toHaveBeenNthCalledWith(1, 'Alt+Shift+Y', expect.any(Function));
+    expect(register).toHaveBeenNthCalledWith(2, 'Alt+Shift+X', expect.any(Function));
+  });
+
   test('cleanup unregisters the active shortcut', async () => {
     register.mockResolvedValue(undefined);
 

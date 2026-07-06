@@ -2,12 +2,18 @@ import { renderHook, act } from '@testing-library/react';
 
 jest.mock('../lib/ocr/streamGeminiContent');
 jest.mock('../components/Toast', () => ({ toast: jest.fn() }));
+jest.mock('../lib/pdf/pdfToImageDataUrls', () => ({ pdfToImageDataUrls: jest.fn() }));
+jest.mock('../lib/files/dataUrlToFile', () => ({ dataUrlToFile: jest.fn() }));
 
 import { useOcrSession } from './useOcrSession';
 import { streamGeminiContent } from '../lib/ocr/streamGeminiContent';
 import { toast } from '../components/Toast';
+import { pdfToImageDataUrls } from '../lib/pdf/pdfToImageDataUrls';
+import { dataUrlToFile } from '../lib/files/dataUrlToFile';
 
 const imageFile = () => new File(['x'], 'demo.png', { type: 'image/png' });
+const pdfFile = () => new File(['pdf'], 'demo.pdf', { type: 'application/pdf' });
+const pageFile = (name) => new File([name], name, { type: 'image/jpeg' });
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 // 给 hook 一个「页面填 Key」直连配置，避免走口令代理分支报错
@@ -22,6 +28,8 @@ const withDirectConfig = (result) => {
 beforeEach(() => {
   window.localStorage.clear();
   streamGeminiContent.mockReset();
+  pdfToImageDataUrls.mockReset();
+  dataUrlToFile.mockReset();
   toast.mockReset();
 });
 
@@ -128,6 +136,93 @@ test('retryRecognition is a no-op when the original file is missing', async () =
   await act(async () => { await result.current.retryRecognition(3); });
 
   expect(streamGeminiContent).not.toHaveBeenCalled();
+});
+
+test('retryRecognition re-runs a failed PDF page with the page image file', async () => {
+  pdfToImageDataUrls.mockResolvedValue(['data:image/jpeg;base64,page1']);
+  dataUrlToFile.mockResolvedValue(pageFile('page_1.jpg'));
+  streamGeminiContent
+    .mockRejectedValueOnce(new Error('first-fail'))
+    .mockImplementationOnce(async ({ onTextChunk }) => { onTextChunk('retry-ok'); });
+
+  const { result } = renderHook(() => useOcrSession());
+  withDirectConfig(result);
+
+  await act(async () => {
+    await result.current.handleFile(pdfFile(), 0);
+    await flush();
+  });
+
+  expect(result.current.files[0].name).toBe('page_1.jpg');
+
+  await act(async () => {
+    await result.current.retryRecognition(0);
+    await flush();
+  });
+
+  expect(streamGeminiContent).toHaveBeenCalledTimes(2);
+  expect(result.current.results[0]).toBe('retry-ok');
+});
+
+test('clearSession prevents resolved PDF conversion from restoring page previews', async () => {
+  let resolvePdf;
+  pdfToImageDataUrls.mockImplementation(() => new Promise((resolve) => { resolvePdf = resolve; }));
+  dataUrlToFile.mockResolvedValue(pageFile('page_1.jpg'));
+  streamGeminiContent.mockImplementation(async ({ onTextChunk }) => { onTextChunk('late-page'); });
+
+  const { result } = renderHook(() => useOcrSession());
+  withDirectConfig(result);
+
+  let pendingUpload;
+  await act(async () => {
+    pendingUpload = result.current.uploadFiles([pdfFile()]);
+    await flush();
+  });
+  expect(result.current.images).toHaveLength(1);
+
+  act(() => { result.current.clearSession(); });
+
+  await act(async () => {
+    resolvePdf(['data:image/jpeg;base64,page1']);
+    await pendingUpload;
+    await flush();
+  });
+
+  expect(result.current.images).toEqual([]);
+  expect(result.current.results).toEqual([]);
+  expect(dataUrlToFile).not.toHaveBeenCalled();
+});
+
+test('uploadFiles keeps later image indices aligned after PDF expands to pages', async () => {
+  const originalCreateObjectURL = URL.createObjectURL;
+  URL.createObjectURL = jest.fn(() => 'blob:image-preview');
+  pdfToImageDataUrls.mockResolvedValue([
+    'data:image/jpeg;base64,page1',
+    'data:image/jpeg;base64,page2',
+  ]);
+  dataUrlToFile.mockImplementation(async (_dataUrl, fileName, mimeType) =>
+    new File([fileName], fileName, { type: mimeType })
+  );
+  let call = 0;
+  streamGeminiContent.mockImplementation(async ({ onTextChunk }) => {
+    call += 1;
+    onTextChunk(`text-${call}`);
+  });
+
+  const { result } = renderHook(() => useOcrSession());
+  withDirectConfig(result);
+
+  try {
+    await act(async () => {
+      await result.current.uploadFiles([pdfFile(), imageFile()]);
+      await flush();
+    });
+
+    expect(result.current.results).toEqual(['text-1', 'text-2', 'text-3']);
+    expect(result.current.files.map(file => file?.name)).toEqual(['page_1.jpg', 'page_2.jpg', 'demo.png']);
+  } finally {
+    URL.createObjectURL = originalCreateObjectURL;
+  }
 });
 
 test('clearSession drops in-flight streaming writes (no resurrection)', async () => {
@@ -331,4 +426,17 @@ test('custom correction prompt is applied; missing {content} degrades to append'
   await act(async () => { await result.current.correctCurrentText(); });
   expect(lastPrompt).toContain('只修 LaTeX 公式');
   expect(lastPrompt).toContain('待纠错内容');
+});
+
+test('correction failure shows a toast and keeps the original text', async () => {
+  streamGeminiContent.mockRejectedValue(new Error('correct-boom'));
+
+  const { result } = renderHook(() => useOcrSession());
+  withDirectConfig(result);
+  act(() => { result.current.setResults(['待纠错内容']); });
+
+  await act(async () => { await result.current.correctCurrentText(); });
+
+  expect(result.current.results[0]).toBe('待纠错内容');
+  expect(toast).toHaveBeenCalledWith('纠错失败：correct-boom', { type: 'error' });
 });

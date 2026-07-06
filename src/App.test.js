@@ -1,5 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
+
+jest.mock('./lib/pdf/pdfToImageDataUrls', () => ({ pdfToImageDataUrls: jest.fn() }));
+
 import App from './App';
+import { pdfToImageDataUrls } from './lib/pdf/pdfToImageDataUrls';
 
 test('renders app heading', () => {
   render(<App />);
@@ -37,4 +41,39 @@ test('opens settings view and shows environment fallbacks', () => {
   expect(screen.getByLabelText('API Key')).toBeInTheDocument();
   expect(screen.getByText(/环境变量（https:\/\/generativelanguage\.googleapis\.com\/v1beta）/)).toBeInTheDocument();
   expect(screen.getByText(/环境变量（gemini-2\.5-flash）/)).toBeInTheDocument();
+});
+
+test('compact empty state keeps the settings entry available', () => {
+  const originalMatchMedia = window.matchMedia;
+  window.matchMedia = jest.fn().mockImplementation((query) => ({
+    matches: true,
+    media: query,
+    onchange: null,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+    addListener: () => {},
+    removeListener: () => {},
+    dispatchEvent: () => false,
+  }));
+
+  try {
+    render(<App />);
+    expect(screen.getByLabelText('打开设置')).toBeVisible();
+  } finally {
+    window.matchMedia = originalMatchMedia;
+  }
+});
+
+test('dropped PDF routes through uploadFiles and shows the svg placeholder', async () => {
+  // 转换挂起，占位缩略图保持可见；旧拖拽路径会给 PDF 一个裂图的 blob 预览
+  pdfToImageDataUrls.mockReturnValue(new Promise(() => {}));
+  const { container } = render(<App />);
+
+  const pdf = new File(['pdf'], 'demo.pdf', { type: 'application/pdf' });
+  fireEvent.drop(container.querySelector('.upload-zone'), {
+    dataTransfer: { items: [{ kind: 'file', getAsFile: () => pdf }] },
+  });
+
+  const thumb = await screen.findByAltText('第 1 页缩略图');
+  expect(thumb.src).toMatch(/^data:image\/svg\+xml/);
 });

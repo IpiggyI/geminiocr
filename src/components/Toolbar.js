@@ -75,7 +75,7 @@ export function Toolbar({
           )}
         </div>
 
-        <button type="button" className="icon-btn" aria-label="打开 API 配置" onClick={onOpenConfig}>
+        <button type="button" className="icon-btn" aria-label="打开设置" onClick={onOpenConfig}>
           <SettingsIcon />
         </button>
       </div>

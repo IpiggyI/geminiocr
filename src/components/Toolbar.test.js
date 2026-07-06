@@ -26,7 +26,7 @@ test('renders action buttons + settings and wires handlers', () => {
   expect(screen.getByLabelText('粘贴')).toBeInTheDocument();
   expect(screen.getByLabelText('使用链接')).toBeInTheDocument();
   expect(screen.getByLabelText('清除')).toBeInTheDocument();
-  expect(screen.getByLabelText('打开 API 配置')).toBeInTheDocument();
+  expect(screen.getByLabelText('打开设置')).toBeInTheDocument();
 
   fireEvent.click(screen.getByLabelText('清除'));
   expect(onClear).toHaveBeenCalled();
