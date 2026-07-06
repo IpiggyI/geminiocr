@@ -86,40 +86,6 @@ header p {
   margin: 0 auto;
 }
 
-.upload-container {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  margin-bottom: 1rem;
-}
-
-.upload-button {
-  background: linear-gradient(135deg, #0071e3, #6200ff);
-  color: white;
-  padding: 1rem 2.5rem;
-  border-radius: 99px;
-  font-size: 1.1rem;
-  font-weight: 500;
-  transition: all 0.3s ease;
-  box-shadow: 0 5px 15px rgba(0, 113, 227, 0.2);
-}
-
-.upload-button::after {
-  display: none;
-}
-
-.upload-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(0, 113, 227, 0.3);
-}
-
-.content-container {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2.5rem;
-  margin-top: 2rem;
-}
-
 .image-preview {
   position: relative;
   aspect-ratio: 4/3;
@@ -294,16 +260,6 @@ header p {
   }
 }
 
-@media (max-width: 768px) {
-  .content-container {
-    grid-template-columns: 1fr;
-  }
-  
-  .result-container {
-    height: 300px;
-  }
-}
-
 .upload-zone {
   position: relative;
   border: 2px dashed #ccc;
@@ -324,12 +280,6 @@ header p {
   background: rgba(76, 175, 80, 0.05);
   transform: scale(1.02);
   box-shadow: 0 0 20px rgba(76, 175, 80, 0.2);
-}
-
-.upload-zone.dragging .upload-container,
-.upload-zone.dragging .upload-hint {
-  opacity: 0;
-  visibility: hidden;
 }
 
 .upload-zone.dragging::after {
@@ -356,56 +306,6 @@ header p {
     opacity: 1;
     transform: translate(-50%, -50%);
   }
-}
-
-.upload-container {
-  transition: all 0.3s ease;
-}
-
-.upload-hint {
-  margin-top: 1rem;
-  color: #86868b;
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
-}
-
-.drag-overlay {
-  display: none;
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(76, 175, 80, 0.1);
-  z-index: 1000;
-  pointer-events: none;
-}
-
-.drag-overlay.active {
-  display: block;
-}
-
-.drag-overlay::after {
-  content: '将图片拖到下方框内';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 1.5em;
-  color: #4CAF50;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 15px 30px;
-  border-radius: 8px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-}
-
-.upload-hint {
-  margin-top: 1rem;
-  color: #86868b;
-  font-size: 0.9rem;
-  user-select: none;
-  text-align: center;
-  width: 100%;
 }
 
 /* ── 步骤3：空态 dropzone 重排 ── */
@@ -594,6 +494,12 @@ header p {
   display: flex;
   align-items: center;
   gap: 0.75rem;
+}
+
+/* ── 步骤6：紧凑态断点统一（.app--compact 由 JS 控制）── */
+.app--compact .toolbar-row {
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
 .toolbar-actions {
@@ -1142,12 +1048,6 @@ main.has-content {
   width: 100%;
 }
 
-.upload-section {
-  width: 100%;
-  max-width: 600px;
-  transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
 .result-section {
   flex: 1;
   min-width: 0;
@@ -1189,13 +1089,6 @@ main.has-content {
   z-index: 1;
 }
 
-/* 响应式布局 */
-@media (max-width: 768px) {
-  .result-container {
-    height: 300px;
-  }
-}
-
 /* 滚动条美化 */
 .result-container::-webkit-scrollbar {
   width: 8px;
@@ -1214,31 +1107,6 @@ main.has-content {
 
 .result-container::-webkit-scrollbar-thumb:hover {
   background: #0077ed;
-}
-
-/* 添加链接按钮样式 */
-.upload-container {
-  display: flex;
-  gap: 1rem;
-  justify-content: center;
-  margin-bottom: 1rem;
-}
-
-.url-button {
-  background: transparent;
-  color: #0071e3;
-  padding: 1rem 2rem;
-  border-radius: 99px;
-  font-size: 1.1rem;
-  font-weight: 500;
-  border: 2px solid #0071e3;
-  transition: all 0.3s ease;
-  cursor: pointer;
-}
-
-.url-button:hover {
-  background: rgba(0, 113, 227, 0.1);
-  transform: translateY(-2px);
 }
 
 .settings-link {
@@ -1502,85 +1370,9 @@ main.has-content {
   transform: translateY(-2px);
 }
 
-@media (max-width: 900px) {
-  .upload-container {
-    flex-wrap: wrap;
-  }
-}
-
-/* 响应式布局优化 */
-@media (max-width: 768px) {
-  .result-section {
-    max-height: 50vh;
-    position: relative;
-    top: 0;
-  }
-
-  .result-container {
-    height: 100%;
-  }
-}
-
-/* 添加图片导航样式 */
-.images-preview {
-  width: 100%;
-}
-
-.image-navigation {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-
-.nav-button {
-  background: #0071e3;
-  color: white;
-  border: none;
-  border-radius: 50%;
-  width: 36px;
-  height: 36px;
-  font-size: 1.2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.nav-button:disabled {
-  background: #ccc;
-  cursor: not-allowed;
-}
-
-.nav-button:not(:disabled):hover {
-  transform: translateY(-2px);
-  box-shadow: 0 5px 15px rgba(0, 113, 227, 0.3);
-}
-
-.image-counter {
-  font-size: 0.9rem;
-  color: #86868b;
-  min-width: 60px;
-  text-align: center;
-}
-
 /* 修改文件输入框支持多文件 */
 #file-input {
   display: none;
-}
-
-/* 添加结果标题样式 */
-.result-header {
-  font-size: 1rem;
-  color: #86868b;
-  margin-bottom: 1rem;
-  padding-bottom: 0.5rem;
-  border-bottom: 1px solid rgba(0, 113, 227, 0.1);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
 }
 
 /* 优化结果容器的滚动效果 */
@@ -2296,44 +2088,6 @@ main.has-content {
   opacity: 0;
   animation: smoothReveal 1s ease-out forwards;
   animation-delay: calc(var(--index) * 50ms);
-}
-
-/* 添加复制按钮样式 */
-.copy-button {
-  background: #0071e3;
-  color: white;
-  border: none;
-  border-radius: 6px;
-  padding: 6px 12px;
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.copy-button:hover {
-  background: #0077ed;
-  transform: translateY(-1px);
-}
-
-.copy-button.copied {
-  background: #34c759;
-}
-
-/* 添加响应式样式 */
-@media (max-width: 768px) {
-  .result-header {
-    flex-direction: column;
-    gap: 0.5rem;
-    align-items: flex-start;
-  }
-  
-  .copy-button {
-    width: 100%;
-    justify-content: center;
-  }
 }
 
 /* LaTeX 公式样式 */

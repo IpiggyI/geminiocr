@@ -45,7 +45,7 @@ function App() {
   const [imageUrl, setImageUrl] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
-  const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches);
   // 桌面窗口可任意缩放，不进入移动端降级布局
   const isCompact = isMobile && !desktopMode;
   const [desktopShortcutConfig, setDesktopShortcutConfig] = useState(() => loadDesktopShortcut());
@@ -118,14 +118,13 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // 添加检测移动设备的 useEffect
+  // 统一断点：matchMedia 监听 768px（桌面端由 isCompact 另行门控，不进紧凑）
   useEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
+    const mql = window.matchMedia('(max-width: 768px)');
+    const handleChange = (e) => setIsMobile(e.matches);
 
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    mql.addEventListener('change', handleChange);
+    return () => mql.removeEventListener('change', handleChange);
   }, []);
 
   // 修改粘贴事件处理函数
@@ -452,7 +451,7 @@ function App() {
   const handleCopyText = (text) => navigator.clipboard.writeText(text);
 
   return (
-    <div className="app">
+    <div className={`app${isCompact ? ' app--compact' : ''}`}>
       <ToastHost />
       {!hasImages && (
         <header>
