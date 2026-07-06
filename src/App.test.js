@@ -28,12 +28,13 @@ test('link button toggles inline url input in empty state', () => {
   expect(screen.getByPlaceholderText('请输入图片链接')).toBeInTheDocument();
 });
 
-test('opens api config modal and shows environment fallbacks', () => {
+test('opens settings view and shows environment fallbacks', () => {
   render(<App />);
 
-  fireEvent.click(screen.getByLabelText('打开 API 配置'));
+  fireEvent.click(screen.getByLabelText('打开设置'));
 
-  expect(screen.getByText('Gemini API 配置')).toBeInTheDocument();
-  expect(screen.getByText('https://generativelanguage.googleapis.com/v1beta')).toBeInTheDocument();
-  expect(screen.getByText('gemini-2.5-flash')).toBeInTheDocument();
+  expect(screen.getByRole('heading', { name: '设置' })).toBeInTheDocument();
+  expect(screen.getByLabelText('API Key')).toBeInTheDocument();
+  expect(screen.getByText(/环境变量（https:\/\/generativelanguage\.googleapis\.com\/v1beta）/)).toBeInTheDocument();
+  expect(screen.getByText(/环境变量（gemini-2\.5-flash）/)).toBeInTheDocument();
 });

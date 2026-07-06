@@ -103,12 +103,42 @@ export function RetryIcon() {
   );
 }
 
-/** 翻译（A→文，沿用 ConfigModal 翻译字形） */
+/** 翻译（A→文） */
 export function TranslateIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M3 5h7M6.5 5v11M10 8c0 4.5-3.5 8.5-7 8.5M4.5 11.5c2 2 5 2.5 7.5 0" />
       <path d="M13 20l3.5-9L20 20M14 17.5h5" />
+    </svg>
+  );
+}
+
+/** 返回（左箭头） */
+export function BackIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M15 18l-6-6 6-6" />
+    </svg>
+  );
+}
+
+/** 显示密码（睁眼） */
+export function EyeIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
+
+/** 隐藏密码（闭眼） */
+export function EyeOffIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M9.9 5.2A9.9 9.9 0 0 1 12 5c6.5 0 10 7 10 7a13.7 13.7 0 0 1-2.16 2.88M6.5 6.5C3.5 8.2 2 12 2 12s3.5 7 10 7a9.7 9.7 0 0 0 4.5-1.1" />
+      <path d="M9.9 9.9a3 3 0 0 0 4.2 4.2" />
+      <path d="M3 3l18 18" />
     </svg>
   );
 }

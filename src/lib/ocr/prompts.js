@@ -1,4 +1,4 @@
-export const OCR_PROMPT = `
+export const DEFAULT_OCR_PROMPT = `
 请识别图片中的文字内容，注意以下要求：
 
 1. 数学公式规范：
@@ -38,20 +38,29 @@ export const OCR_PROMPT = `
 请按照以上规范输出识别结果。
 `;
 
-export const CORRECTION_PROMPT = `请检查并纠正以下数学公式和文本内容中的错误，特别注意：
+export const DEFAULT_CORRECTION_PROMPT = `请检查并纠正以下数学公式和文本内容中的错误，特别注意：
 1. LaTeX 公式语法
 2. 数学符号的正确性
 3. 格式排版的规范性
-5. 不要添加任何解释，直接输出修正后的内容
-6. 修正之后的数据一定是要可以正确解析的
+4. 不要添加任何解释，直接输出修正后的内容
+5. 修正之后的数据一定是要可以正确解析的
 
 以下是需要检查的内容：
 {content}
 `;
 
-export const TRANSLATE_PROMPT = `请将以下内容翻译成{lang}，只输出翻译后的内容，不要添加任何解释或说明：
+export const DEFAULT_TRANSLATE_PROMPT = `请将以下内容翻译成{lang}，只输出翻译后的内容，不要添加任何解释或说明：
 
 {content}`;
 
 // 重试识别时追加到 OCR prompt 末尾（第 2 次尝试起）
 export const RETRY_HINT = `注意：上一次识别可能不完整或存在错误，请更仔细地逐字重新识别，确保不遗漏任何文字、公式与表格，并严格遵守上述格式要求。`;
+
+/**
+ * 解析生效提示词：自定义值（去空后非空）优先，否则回落内置默认。
+ * @param {string} custom 用户自定义提示词（localStorage）
+ * @param {string} fallback 内置默认提示词
+ * @returns {string}
+ */
+export const resolvePrompt = (custom, fallback) =>
+  custom && custom.trim() ? custom : fallback;

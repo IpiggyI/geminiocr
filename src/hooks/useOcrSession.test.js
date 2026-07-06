@@ -256,3 +256,79 @@ test('translate failure keeps original results intact and records translateError
   expect(result.current.translations[0] || '').toBe('');
   expect(result.current.translateErrors[0]).toContain('translate-boom');
 });
+
+test('custom OCR prompt reaches the model; clearing it falls back to the built-in default', async () => {
+  let lastPrompt = '';
+  streamGeminiContent.mockImplementation(async ({ prompt, onTextChunk }) => {
+    lastPrompt = prompt;
+    onTextChunk('x');
+  });
+
+  const { result } = renderHook(() => useOcrSession());
+  withDirectConfig(result);
+
+  act(() => { result.current.setOcrPromptConfig('我的自定义 OCR 提示词'); });
+  await act(async () => { await result.current.handleFile(imageFile(), 0); await flush(); });
+  expect(lastPrompt).toContain('我的自定义 OCR 提示词');
+
+  act(() => { result.current.setOcrPromptConfig(''); });
+  await act(async () => { await result.current.handleFile(imageFile(), 1); await flush(); });
+  expect(lastPrompt).toContain('请识别图片中的文字内容'); // 内置默认
+});
+
+test('custom translate prompt is applied with {lang}/{content} substitution', async () => {
+  let lastPrompt = '';
+  streamGeminiContent.mockImplementation(async ({ prompt, onTextChunk }) => {
+    lastPrompt = prompt;
+    onTextChunk('译');
+  });
+
+  const { result } = renderHook(() => useOcrSession());
+  withDirectConfig(result);
+  act(() => {
+    result.current.setResults(['源文本']);
+    result.current.setTranslatePromptConfig('自定义翻译到 {lang}：{content}');
+  });
+
+  await act(async () => { await result.current.translateResult(0); });
+  expect(lastPrompt).toContain('自定义翻译到 中文：');
+  expect(lastPrompt).toContain('源文本');
+});
+
+test('missing API key error attaches a "去设置" guidance action to the toast', async () => {
+  const onNeedApiKey = jest.fn();
+  streamGeminiContent.mockRejectedValue(new Error('缺少 Gemini API Key，请在设置中填入 API Key'));
+
+  const { result } = renderHook(() => useOcrSession({ onNeedApiKey }));
+  withDirectConfig(result);
+
+  await act(async () => { await result.current.handleFile(imageFile(), 0); });
+
+  const errorToast = toast.mock.calls.find(([msg]) => msg.includes('缺少 Gemini API Key'));
+  expect(errorToast).toBeDefined();
+  expect(errorToast[1].action).toMatchObject({ label: '去设置' });
+
+  // 点击引导动作触发回调（App 层跳设置并聚焦 Key）
+  errorToast[1].action.onClick();
+  expect(onNeedApiKey).toHaveBeenCalled();
+});
+
+test('custom correction prompt is applied; missing {content} degrades to append', async () => {
+  let lastPrompt = '';
+  streamGeminiContent.mockImplementation(async ({ prompt, onTextChunk }) => {
+    lastPrompt = prompt;
+    onTextChunk('fixed');
+  });
+
+  const { result } = renderHook(() => useOcrSession());
+  withDirectConfig(result);
+
+  // 缺 {content} 占位符 → 降级为追加原文，不丢文本
+  act(() => {
+    result.current.setResults(['待纠错内容']);
+    result.current.setCorrectionPromptConfig('只修 LaTeX 公式');
+  });
+  await act(async () => { await result.current.correctCurrentText(); });
+  expect(lastPrompt).toContain('只修 LaTeX 公式');
+  expect(lastPrompt).toContain('待纠错内容');
+});

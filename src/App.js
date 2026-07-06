@@ -7,17 +7,24 @@ import { clipboardImageToFile, readBrowserClipboardImage } from './desktop/clipb
 import { shouldHandleGlobalPasteEvent } from './desktop/pasteGuards';
 import { fetchImageBlob } from './lib/files/fetchImageBlob';
 import { ToastHost, toast } from './components/Toast';
-import { ConfigModal } from './components/ConfigModal';
+import { SettingsView } from './components/settings/SettingsView';
 import { UploadDropzone } from './components/UploadDropzone';
 import { Toolbar } from './components/Toolbar';
 import { SplitPane } from './components/SplitPane';
 import { ImagePane } from './components/ImagePane';
 import { ResultPane } from './components/ResultPane';
 import { SettingsIcon } from './components/icons';
-import { loadDesktopShortcut, saveDesktopShortcut } from './desktop/desktopPreferences';
+import { loadDesktopShortcut, saveDesktopShortcut, DEFAULT_DESKTOP_SHORTCUT } from './desktop/desktopPreferences';
 
 function App() {
-  const ocr = useOcrSession();
+  // 视图切换 + 缺 Key 引导（识别失败带「去设置」动作时跳设置并聚焦 Key 输入框）
+  const [view, setView] = useState('main'); // 'main' | 'settings'
+  const apiKeyInputRef = useRef(null);
+  const focusKeyInSettings = () => {
+    setView('settings');
+    requestAnimationFrame(() => apiKeyInputRef.current?.focus());
+  };
+  const ocr = useOcrSession({ onNeedApiKey: focusKeyInSettings });
   const {
     images, setImages,
     results, setResults,
@@ -44,7 +51,6 @@ function App() {
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [imageUrl, setImageUrl] = useState('');
   const [showModal, setShowModal] = useState(false);
-  const [showConfigModal, setShowConfigModal] = useState(false);
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 768px)').matches);
   // 桌面窗口可任意缩放，不进入移动端降级布局
   const isCompact = isMobile && !desktopMode;
@@ -401,54 +407,75 @@ function App() {
     setShowModal(false);
   };
 
-  const handleCloseConfigModal = () => {
+  const openSettings = () => {
     setDesktopShortcutConfig(activeDesktopShortcut);
     setDesktopShortcutError('');
-    setShowConfigModal(false);
+    setView('settings');
   };
 
-  const openConfigModal = () => {
-    setDesktopShortcutConfig(activeDesktopShortcut);
-    setDesktopShortcutError('');
-    setShowConfigModal(true);
-  };
+  // 设置视图内录制快捷键：即时注册生效，失败置错误态（不弹 toast，就地展示）
+  const applyDesktopShortcut = async (nextShortcut) => {
+    setDesktopShortcutConfig(nextShortcut);
+    if (!desktopMode) return;
 
-  const handleSaveConfigModal = async () => {
-    let shortcutErrorMessage = '';
+    try {
+      const result = await initDesktopShortcut({
+        shortcut: nextShortcut,
+        onTriggered: () => desktopShortcutHandlerRef.current(),
+      });
 
-    if (desktopMode) {
-      try {
-        const result = await initDesktopShortcut({
-          shortcut: desktopShortcutConfig,
-          onTriggered: () => desktopShortcutHandlerRef.current(),
-        });
-
-        if (result.ok) {
-          desktopShortcutCleanupRef.current = result.cleanup;
-          const persistedShortcut = saveDesktopShortcut(result.activeShortcut);
-          setActiveDesktopShortcut(persistedShortcut);
-          setDesktopShortcutConfig(persistedShortcut);
-          setDesktopShortcutError('');
-        } else {
-          shortcutErrorMessage = result.message;
-          setDesktopShortcutError(result.message);
-        }
-      } catch (error) {
-        shortcutErrorMessage = `快捷键注册失败，请检查格式或更换组合键 (${error.message})`;
-        console.error('保存桌面快捷键失败:', error);
-        setDesktopShortcutError(shortcutErrorMessage);
+      if (result.ok) {
+        desktopShortcutCleanupRef.current = result.cleanup;
+        const persistedShortcut = saveDesktopShortcut(result.activeShortcut);
+        setActiveDesktopShortcut(persistedShortcut);
+        setDesktopShortcutConfig(persistedShortcut);
+        setDesktopShortcutError('');
+      } else {
+        setDesktopShortcutError(result.message);
       }
+    } catch (error) {
+      console.error('保存桌面快捷键失败:', error);
+      setDesktopShortcutError(`快捷键注册失败，请检查格式或更换组合键 (${error.message})`);
     }
+  };
 
-    setShowConfigModal(false);
-
-    if (shortcutErrorMessage) {
-      toast(shortcutErrorMessage, { type: 'error' });
-    }
+  // 清空并回落环境变量：API 配置 + 三条提示词 + 翻译语言/开关 + 桌面快捷键一并复位
+  const resetSettings = () => {
+    ocr.setApiUrlConfig('');
+    ocr.setApiKeyConfig('');
+    ocr.setModelConfig('');
+    ocr.setAccessTokenConfig('');
+    ocr.setOcrPromptConfig('');
+    ocr.setTranslatePromptConfig('');
+    ocr.setCorrectionPromptConfig('');
+    ocr.setTranslateEnabled(false);
+    ocr.setTranslateLang('中文');
+    if (desktopMode) applyDesktopShortcut(DEFAULT_DESKTOP_SHORTCUT);
   };
 
   // 复制文本（复制反馈由 ResultPane 的本地 state 驱动，此处只负责写剪贴板）
   const handleCopyText = (text) => navigator.clipboard.writeText(text);
+
+  // 独立设置视图：主界面状态留在 App 层，切换不卸载、返回后识别结果保留
+  if (view === 'settings') {
+    return (
+      <div className={`app${isCompact ? ' app--compact' : ''}`}>
+        <ToastHost />
+        <SettingsView
+          ocr={ocr}
+          desktopMode={desktopMode}
+          desktop={{
+            shortcutConfig: desktopShortcutConfig,
+            shortcutError: desktopShortcutError,
+            applyShortcut: applyDesktopShortcut,
+          }}
+          keyInputRef={apiKeyInputRef}
+          onBack={() => setView('main')}
+          onReset={resetSettings}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className={`app${isCompact ? ' app--compact' : ''}`}>
@@ -458,8 +485,8 @@ function App() {
           <button
             type="button"
             className="settings-link"
-            aria-label="打开 API 配置"
-            onClick={openConfigModal}
+            aria-label="打开设置"
+            onClick={openSettings}
             style={{ display: isCompact ? 'none' : 'flex' }}
           >
             <SettingsIcon />
@@ -524,7 +551,7 @@ function App() {
               onToggleTranslate={() => ocr.setTranslateEnabled(!ocr.translateEnabled)}
               translateLang={ocr.translateLang}
               onChangeLang={(e) => ocr.setTranslateLang(e.target.value)}
-              onOpenConfig={openConfigModal}
+              onOpenConfig={openSettings}
               imageUrl={imageUrl}
               onImageUrlChange={(e) => setImageUrl(e.target.value)}
               onUrlSubmit={handleUrlSubmit}
@@ -566,20 +593,6 @@ function App() {
         </div>
       )}
 
-      {showConfigModal && (
-        <ConfigModal
-          ocr={ocr}
-          desktop={{
-            enabled: desktopMode,
-            shortcutConfig: desktopShortcutConfig,
-            setShortcutConfig: setDesktopShortcutConfig,
-            shortcutError: desktopShortcutError,
-            setShortcutError: setDesktopShortcutError,
-          }}
-          onClose={handleCloseConfigModal}
-          onSave={handleSaveConfigModal}
-        />
-      )}
     </div>
   );
 }

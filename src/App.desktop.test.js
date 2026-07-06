@@ -31,7 +31,7 @@ describe('App desktop regressions', () => {
     consoleErrorSpy.mockRestore();
   });
 
-  test('saving api config still closes modal when shortcut update fails', async () => {
+  test('recording a failing shortcut surfaces the error inline in settings', async () => {
     initDesktopShortcut
       .mockResolvedValueOnce({
         ok: true,
@@ -47,14 +47,20 @@ describe('App desktop regressions', () => {
 
     render(<App />);
 
-    fireEvent.click(screen.getByLabelText('打开 API 配置'));
-    fireEvent.change(screen.getByPlaceholderText(/Gemini API Key/), {
-      target: { value: 'test-key' },
+    // 等待桌面 bootstrap 首次注册完成（消费第 1 个 mock）
+    await waitFor(() => expect(initDesktopShortcut).toHaveBeenCalled());
+
+    fireEvent.click(screen.getByLabelText('打开设置'));
+
+    // 在设置视图录制一个新组合键 → 即时注册失败 → 就地展示错误
+    fireEvent.keyDown(screen.getByLabelText('全局快捷键'), {
+      code: 'KeyP',
+      ctrlKey: true,
+      shiftKey: true,
     });
-    fireEvent.click(screen.getByText('完成'));
 
     await waitFor(() => {
-      expect(screen.queryByText('Gemini API 配置')).not.toBeInTheDocument();
+      expect(screen.getByText('快捷键注册失败')).toBeInTheDocument();
     });
   });
 
@@ -69,7 +75,7 @@ describe('App desktop regressions', () => {
         expect(initDesktopShortcut).toHaveBeenCalled();
       });
 
-      expect(screen.getByLabelText('打开 API 配置')).toBeVisible();
+      expect(screen.getByLabelText('打开设置')).toBeVisible();
     } finally {
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: originalInnerWidth });
     }

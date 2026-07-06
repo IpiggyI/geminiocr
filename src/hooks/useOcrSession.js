@@ -4,6 +4,7 @@ import { streamGeminiContent } from '../lib/ocr/streamGeminiContent';
 import { recognizeImage } from '../lib/ocr/recognizeImage';
 import { correctText } from '../lib/ocr/correctText';
 import { translateText } from '../lib/ocr/translateText';
+import { DEFAULT_OCR_PROMPT, DEFAULT_CORRECTION_PROMPT, DEFAULT_TRANSLATE_PROMPT, resolvePrompt } from '../lib/ocr/prompts';
 import { dataUrlToFile } from '../lib/files/dataUrlToFile';
 import { pdfToImageDataUrls } from '../lib/pdf/pdfToImageDataUrls';
 import { isTauri } from '../desktop/tauriBridge';
@@ -15,6 +16,16 @@ const API_CONFIG_STORAGE_KEYS = {
   model: 'geminiocr-model-config',
   accessToken: 'geminiocr-access-token',
 };
+
+// 自定义提示词存储键（空串=未自定义，回落内置默认）
+const PROMPT_STORAGE_KEYS = {
+  ocr: 'geminiocr-prompt-ocr',
+  translate: 'geminiocr-prompt-translate',
+  correction: 'geminiocr-prompt-correction',
+};
+
+// 默认翻译目标语言存储键
+const TRANSLATE_LANG_STORAGE_KEY = 'geminiocr-translate-lang';
 
 const readStoredValue = (key) => {
   if (typeof window === 'undefined') return '';
@@ -33,8 +44,11 @@ const writeStoredValue = (key, value) => {
 /**
  * 统一管理 OCR 会话状态与动作
  * Web 端和 Desktop 端共用
+ * @param {{ onNeedApiKey?: () => void }} [options] 识别报缺 Key/口令时的引导回调（打开设置并聚焦）
  */
-export const useOcrSession = () => {
+export const useOcrSession = ({ onNeedApiKey } = {}) => {
+  const onNeedApiKeyRef = useRef(onNeedApiKey);
+  onNeedApiKeyRef.current = onNeedApiKey;
   // ─── 核心状态 ───
   const [images, setImages] = useState([]);
   const [results, setResults] = useState([]);
@@ -52,11 +66,13 @@ export const useOcrSession = () => {
 
   // ─── 翻译配置 ───
   const [translateEnabled, setTranslateEnabled] = useState(false);
-  const [translateLang, setTranslateLang] = useState('中文');
+  // 目标语言持久化：作为「默认翻译语言」跨会话记忆（设置视图桌面组 / Web Toolbar 共用）
+  const [translateLang, setTranslateLang] = useState(() => readStoredValue(TRANSLATE_LANG_STORAGE_KEY) || '中文');
   const translateEnabledRef = useRef(false);
   const translateLangRef = useRef('中文');
   useEffect(() => { translateEnabledRef.current = translateEnabled; }, [translateEnabled]);
   useEffect(() => { translateLangRef.current = translateLang; }, [translateLang]);
+  useEffect(() => { writeStoredValue(TRANSLATE_LANG_STORAGE_KEY, translateLang); }, [translateLang]);
 
   // ─── API 配置 ───
   const [apiUrlConfig, setApiUrlConfig] = useState(() => readStoredValue(API_CONFIG_STORAGE_KEYS.apiUrl));
@@ -68,6 +84,23 @@ export const useOcrSession = () => {
   useEffect(() => { writeStoredValue(API_CONFIG_STORAGE_KEYS.apiKey, apiKeyConfig); }, [apiKeyConfig]);
   useEffect(() => { writeStoredValue(API_CONFIG_STORAGE_KEYS.model, modelConfig); }, [modelConfig]);
   useEffect(() => { writeStoredValue(API_CONFIG_STORAGE_KEYS.accessToken, accessTokenConfig); }, [accessTokenConfig]);
+
+  // ─── 自定义提示词（空串=用内置默认）───
+  const [ocrPromptConfig, setOcrPromptConfig] = useState(() => readStoredValue(PROMPT_STORAGE_KEYS.ocr));
+  const [translatePromptConfig, setTranslatePromptConfig] = useState(() => readStoredValue(PROMPT_STORAGE_KEYS.translate));
+  const [correctionPromptConfig, setCorrectionPromptConfig] = useState(() => readStoredValue(PROMPT_STORAGE_KEYS.correction));
+
+  useEffect(() => { writeStoredValue(PROMPT_STORAGE_KEYS.ocr, ocrPromptConfig); }, [ocrPromptConfig]);
+  useEffect(() => { writeStoredValue(PROMPT_STORAGE_KEYS.translate, translatePromptConfig); }, [translatePromptConfig]);
+  useEffect(() => { writeStoredValue(PROMPT_STORAGE_KEYS.correction, correctionPromptConfig); }, [correctionPromptConfig]);
+
+  // ref 镜像：稳定的动作 useCallback 在调用时读到最新提示词，不进依赖数组
+  const ocrPromptRef = useRef(ocrPromptConfig);
+  const translatePromptRef = useRef(translatePromptConfig);
+  const correctionPromptRef = useRef(correctionPromptConfig);
+  useEffect(() => { ocrPromptRef.current = ocrPromptConfig; }, [ocrPromptConfig]);
+  useEffect(() => { translatePromptRef.current = translatePromptConfig; }, [translatePromptConfig]);
+  useEffect(() => { correctionPromptRef.current = correctionPromptConfig; }, [correctionPromptConfig]);
 
   const envConfig = {
     apiUrl: process.env.REACT_APP_GEMINI_API_URL || DEFAULT_GEMINI_API_URL,
@@ -129,6 +162,7 @@ export const useOcrSession = () => {
       let liveText = '';
       const fullText = await recognizeImage({
         file,
+        prompt: resolvePrompt(ocrPromptRef.current, DEFAULT_OCR_PROMPT),
         retryHint: attempt >= 2,
         streamClient: callGeminiStream,
         onTextChunk: (chunk) => {
@@ -168,7 +202,13 @@ export const useOcrSession = () => {
       const errorMessage = `识别失败：${error.message}`;
       // 错误进错误通道，不写入 results（避免错误文本污染识别结果）
       setErrors(prev => { if (stale()) return prev; const next = [...prev]; next[index] = errorMessage; return next; });
-      if (!stale()) toast(errorMessage, { type: 'error' });
+      if (!stale()) {
+        // 缺 Key / 缺访问口令 → toast 附「去设置」引导（错误文案含「请在设置中填入」）
+        const needsConfig = error.message.includes('请在设置中填入');
+        toast(errorMessage, needsConfig && onNeedApiKeyRef.current
+          ? { type: 'error', duration: 8000, action: { label: '去设置', onClick: onNeedApiKeyRef.current } }
+          : { type: 'error' });
+      }
       throw error;
     }
   }, [callGeminiStream]);
@@ -327,6 +367,7 @@ export const useOcrSession = () => {
       let liveText = '';
       await correctText({
         text: results[currentIndex],
+        promptTemplate: resolvePrompt(correctionPromptRef.current, DEFAULT_CORRECTION_PROMPT),
         streamClient: callGeminiStream,
         onTextChunk: (chunk) => {
           liveText += chunk;
@@ -358,6 +399,7 @@ export const useOcrSession = () => {
       await translateText({
         text: source,
         lang: translateLangRef.current,
+        promptTemplate: resolvePrompt(translatePromptRef.current, DEFAULT_TRANSLATE_PROMPT),
         streamClient: callGeminiStream,
         onTextChunk: (chunk) => {
           liveText += chunk;
@@ -435,6 +477,9 @@ export const useOcrSession = () => {
     apiKeyConfig, setApiKeyConfig,
     modelConfig, setModelConfig,
     accessTokenConfig, setAccessTokenConfig,
+    ocrPromptConfig, setOcrPromptConfig,
+    translatePromptConfig, setTranslatePromptConfig,
+    correctionPromptConfig, setCorrectionPromptConfig,
     envConfig,
 
     // 动作
