@@ -1,0 +1,5 @@
+{"file": ".trellis/spec/frontend/quality-guidelines.md", "reason": "Jest+RTL 测试、ESLint、错误处理与审查清单——验收提示词传参断言与 npm test 全绿"}
+{"file": ".trellis/spec/frontend/index.md", "reason": "规范索引对照，确认改动落在既定分层内"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "校验受控组件、Key 可见性无障碍(aria-pressed)、Toast action 扩展是否合规"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "校验 localStorage 回落链与不可变更新，清空回落环境变量逻辑正确"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "校验提示词跨层链路端到端一致（自定义值真实传到 lib/ocr 请求）"}

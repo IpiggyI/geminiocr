@@ -1,0 +1,8 @@
+{"file": ".trellis/spec/frontend/index.md", "reason": "前端规范总索引与心智模型（App→hooks→lib 分层），设置视图落位需对照"}
+{"file": ".trellis/spec/frontend/directory-structure.md", "reason": "新建 src/components/settings/ 的分层与命名约定"}
+{"file": ".trellis/spec/frontend/component-guidelines.md", "reason": "函数组件+具名导出/受控组件/全局CSS/Toast/无障碍——SettingsView 及各 Section 的核心约定"}
+{"file": ".trellis/spec/frontend/hook-guidelines.md", "reason": "useOcrSession 编排改造：三条提示词状态接入 recognize/translate/correct 调用点"}
+{"file": ".trellis/spec/frontend/state-management.md", "reason": "localStorage 提示词存储语义 + Key 留空回落环境变量的配置回落链"}
+{"file": ".trellis/spec/frontend/desktop-integration.md", "reason": "DesktopSection 快捷键录制需 isTauri() 守卫 + 动态 import，web 安全降级"}
+{"file": ".trellis/spec/guides/cross-layer-thinking-guide.md", "reason": "提示词跨层数据流（设置UI→localStorage→hook→lib/ocr），避免层间格式错配"}
+{"file": ".trellis/spec/guides/code-reuse-thinking-guide.md", "reason": "抽取 DEFAULT_*_PROMPT/resolvePrompt 前先搜索复用，修改常量前先 grep"}
