@@ -1,0 +1,31 @@
+{
+  "id": "desktop-overhaul",
+  "name": "desktop-overhaul",
+  "title": "桌面端体检改造：漂亮高可用 App",
+  "description": "基于 2026-07-04 全仓体检报告的三批次改造总任务：修断裂、主界面重做、设置页重做",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P1",
+  "creator": "misaka",
+  "assignee": "misaka",
+  "createdAt": "2026-07-05",
+  "completedAt": "2026-07-06",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-05-fix-broken-desktop",
+    "07-05-main-ui-redesign",
+    "07-05-settings-view",
+    "07-05-web-api-security"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
